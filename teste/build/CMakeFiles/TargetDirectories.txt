@@ -1,0 +1,3 @@
+/home/tavares/Documentos/unisinos/processamento-grafico/atividade/teste/build/CMakeFiles/main.dir
+/home/tavares/Documentos/unisinos/processamento-grafico/atividade/teste/build/CMakeFiles/edit_cache.dir
+/home/tavares/Documentos/unisinos/processamento-grafico/atividade/teste/build/CMakeFiles/rebuild_cache.dir
