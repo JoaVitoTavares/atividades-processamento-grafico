@@ -92,6 +92,7 @@ int main()
     // Compila e linka os shaders
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
+    // reloca um shader já criado a um espaço na memoria de um endereçamento..
     glCompileShader(vertexShader);
 
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
