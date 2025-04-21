@@ -74,11 +74,12 @@ int main()
     }
 
     // Vertex shader → define as posições dos vértices
-    GLuint triangle1 = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
-    GLuint triangle2 = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
-    GLuint triangle3 = createTriangle(3.0, 3.5, -3.5, -3.5, 3.5, -3.5);
-    GLuint triangle4 = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
-    GLuint triangle5 = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
+    GLuint triangle1 = createTriangle(-0.8f, 0.8f, -0.9f, 0.6f, -0.7f, 0.6f);    // canto superior esquerdo
+    GLuint triangle2 = createTriangle(0.8f, 0.8f, 0.7f, 0.6f, 0.9f, 0.6f);       // canto superior direito
+    GLuint triangle3 = createTriangle(-0.8f, -0.8f, -0.9f, -0.6f, -0.7f, -0.6f); // canto inferior esquerdo
+    GLuint triangle4 = createTriangle(0.8f, -0.8f, 0.7f, -0.6f, 0.9f, -0.6f);    // canto inferior direito
+    GLuint triangle5 = createTriangle(0.0f, 0.1f, -0.1f, -0.1f, 0.2f, -0.1f);    // centro, torto
+
     GLuint triangleArrays[5] = {triangle1, triangle2, triangle3, triangle4, triangle5};
 
     const char *vertexShaderSource = R"(
