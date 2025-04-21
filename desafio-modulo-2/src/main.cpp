@@ -74,8 +74,12 @@ int main()
     }
 
     // Vertex shader → define as posições dos vértices
-
-    GLuint vao = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
+    GLuint triangle1 = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
+    GLuint triangle2 = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
+    GLuint triangle3 = createTriangle(3.0, 3.5, -3.5, -3.5, 3.5, -3.5);
+    GLuint triangle4 = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
+    GLuint triangle5 = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
+    GLuint triangleArrays[5] = {triangle1, triangle2, triangle3, triangle4, triangle5};
 
     const char *vertexShaderSource = R"(
         #version 330 core
@@ -119,9 +123,12 @@ int main()
         glClearColor(0.2f, 0.3f, 0.4f, 1.0f); // azul-acinzentado
         glClear(GL_COLOR_BUFFER_BIT);         // limpa a tela com a cor acima
 
-        glUseProgram(shaderProgram);      // Usa os shaders compilados
-        glBindVertexArray(vao);           // Ativa os dados do triângulo
-        glDrawArrays(GL_TRIANGLES, 0, 3); // Desenha 3 vértices (1 triângulo)
+        glUseProgram(shaderProgram); // Usa os shaders compilados
+        for (GLuint triangleElement : triangleArrays)
+        {
+            glBindVertexArray(triangleElement); // Ativa os dados do triângulo
+            glDrawArrays(GL_TRIANGLES, 0, 3);   // Desenha 3 vértices (1 triângulo)
+        }
 
         glfwSwapBuffers(window); // Atualiza a janela com o conteúdo renderizado
         glfwPollEvents();        // Processa eventos de teclado, mouse etc.
