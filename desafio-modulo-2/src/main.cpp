@@ -9,6 +9,38 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
     glViewport(0, 0, width, height); // Atualiza a área visível (viewport) com o novo tamanho
 }
 
+GLuint createTriangle(float x0, float y0, float x1, float y1, float x2, float y2)
+{
+    unsigned int VAO, VBO;      // vao guarda o estado de configuração dos atributos dos vértices
+    glGenVertexArrays(1, &VAO); // Cria um VAO
+    glGenBuffers(1, &VBO);      // Cria um VBO
+                                // VAO → Vertex Array Object (guarda como os dados devem ser interpretados).
+    // informa tipo, bytes por linha, byte de começo
+
+    // VBO → Vertex Buffer Object (guarda os dados dos vértices).
+    // informa coordenadas
+    glBindBuffer(GL_ARRAY_BUFFER, VBO); // Ativa o VBO como buffer de vértices atual
+
+    glBindVertexArray(VAO); // A partir de agora, qualquer configuração de atributos será associada a esse VAO
+
+    float vertices[] = {
+        x0, y0, // topo
+        x1, y1, // canto esquerdo
+        x2, y2, // canto direito
+    };
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // Os dados do array "vertices" são copiados para o buffer da GPU (ligados ao VBO)
+    // posição dos atributos (x, y)
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0); // Ativa o atributo de vértice 0
+    // Explica ao OpenGL como ler os dados do buffer: location 0, dois floats por vértice, tipo float, sem normalizar, espaçamento 2 floats, sem offset
+    glEnableVertexAttribArray(0); // Ativa o atributo de vértice 0
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0); // Desativa o VBO (boa prática)
+    glBindVertexArray(0);             // Desativa o VAO (boa prática)
+    return VAO;
+}
+
 int main()
 {
     // Inicialização da biblioteca GLFW
@@ -41,37 +73,10 @@ int main()
         return -1;
     }
 
-    // VAO → Vertex Array Object (guarda como os dados devem ser interpretados).
-    // informa tipo, bytes por linha, byte de começo
-
-    // VBO → Vertex Buffer Object (guarda os dados dos vértices).
-    // informa coordenadas
-
-    unsigned int VAO, VBO;      // vao guarda o estado de configuração dos atributos dos vértices
-    glGenVertexArrays(1, &VAO); // Cria um VAO
-    glGenBuffers(1, &VBO);      // Cria um VBO
-
-    glBindVertexArray(VAO); // A partir de agora, qualquer configuração de atributos será associada a esse VAO
-
-    float vertices[] = {
-        0.0f, 0.5f,   // topo
-        -0.5f, -0.5f, // canto esquerdo
-        0.5f, -0.5f   // canto direito
-    };
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO); // Ativa o VBO como buffer de vértices atual
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    // Os dados do array "vertices" são copiados para o buffer da GPU (ligados ao VBO)
-
-    // posição dos atributos (x, y)
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
-    // Explica ao OpenGL como ler os dados do buffer: location 0, dois floats por vértice, tipo float, sem normalizar, espaçamento 2 floats, sem offset
-    glEnableVertexAttribArray(0); // Ativa o atributo de vértice 0
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0); // Desativa o VBO (boa prática)
-    glBindVertexArray(0);             // Desativa o VAO (boa prática)
-
     // Vertex shader → define as posições dos vértices
+
+    GLuint vao = createTriangle(0.0, 0.5, -0.5, -0.5, 0.5, -0.5);
+
     const char *vertexShaderSource = R"(
         #version 330 core
         layout (location = 0) in vec2 aPos;
@@ -115,7 +120,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);         // limpa a tela com a cor acima
 
         glUseProgram(shaderProgram);      // Usa os shaders compilados
-        glBindVertexArray(VAO);           // Ativa os dados do triângulo
+        glBindVertexArray(vao);           // Ativa os dados do triângulo
         glDrawArrays(GL_TRIANGLES, 0, 3); // Desenha 3 vértices (1 triângulo)
 
         glfwSwapBuffers(window); // Atualiza a janela com o conteúdo renderizado
