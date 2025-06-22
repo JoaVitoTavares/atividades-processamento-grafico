@@ -1,0 +1,308 @@
+// IsometricTilemap.cpp
+// Desenho e navegação em tilemap isométrico (diamond) em OpenGL 3.3
+
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#include <iostream>
+
+typedef unsigned int uint;
+const uint SCR_W = 800, SCR_H = 600;
+
+const int MAP_H = 15;
+const int MAP_W = 15;
+int mapData[MAP_H][MAP_W] = {
+    {1, 1, 1, 4, 0, 4, 1, 1, 3, 4, 2, 3, 1, 1, 4},
+    {4, 1, 4, 2, 3, 4, 4, 4, 3, 3, 1, 4, 3, 0, 1},
+    {4, 0, 1, 1, 4, 2, 1, 3, 1, 2, 4, 1, 2, 4, 4},
+    {1, 0, 4, 0, 1, 4, 2, 2, 4, 1, 1, 4, 2, 4, 2},
+    {0, 4, 1, 4, 4, 1, 1, 1, 0, 4, 1, 2, 4, 4, 1},
+    {4, 2, 1, 1, 3, 0, 4, 2, 4, 1, 1, 1, 4, 3, 1},
+    {3, 2, 1, 2, 4, 1, 0, 3, 2, 4, 4, 0, 1, 2, 3},
+    {1, 2, 3, 1, 4, 3, 1, 4, 2, 0, 4, 2, 1, 4, 3},
+    {1, 1, 4, 2, 2, 4, 1, 1, 1, 3, 4, 4, 1, 2, 1},
+    {4, 3, 2, 4, 0, 2, 1, 1, 4, 2, 1, 3, 0, 3, 4},
+    {1, 1, 4, 1, 4, 2, 4, 4, 0, 2, 4, 1, 2, 3, 4},
+    {1, 0, 3, 1, 4, 1, 1, 1, 0, 4, 2, 4, 4, 2, 3},
+    {1, 2, 4, 4, 3, 1, 0, 4, 2, 1, 4, 1, 3, 0, 2},
+    {3, 2, 4, 1, 4, 1, 1, 4, 2, 3, 1, 1, 4, 4, 0},
+    {1, 4, 2, 1, 2, 1, 0, 4, 3, 3, 4, 4, 2, 1, 4}};
+
+const int PINK_TILE_INDEX = 6;
+
+bool visited[MAP_H][MAP_W] = {false};
+
+GLuint loadTexture(const char *path)
+{
+    stbi_set_flip_vertically_on_load(true);
+    int w, h, n;
+    unsigned char *data = stbi_load(path, &w, &h, &n, 0);
+    if (!data)
+    {
+        std::cerr << "Failed to load " << path << "\n";
+        return 0;
+    }
+    GLenum fmt = (n == 3 ? GL_RGB : GL_RGBA);
+    GLuint t;
+    glGenTextures(1, &t);
+    glBindTexture(GL_TEXTURE_2D, t);
+    glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    stbi_image_free(data);
+    return t;
+}
+
+GLuint quadVAO;
+void initQuad()
+{
+    float V[] = {
+        -0.5f, 0.5f, 0.0f, 1.0f,
+        0.5f, -0.5f, 1.0f, 0.0f,
+        -0.5f, -0.5f, 0.0f, 0.0f,
+        -0.5f, 0.5f, 0.0f, 1.0f,
+        0.5f, 0.5f, 1.0f, 1.0f,
+        0.5f, -0.5f, 1.0f, 0.0f};
+    GLuint VBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &VBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(V), V, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
+    glBindVertexArray(0);
+}
+
+const char *vsSrc = R"glsl(
+#version 330 core
+layout(location=0) in vec2 aPos;
+layout(location=1) in vec2 aUV;
+uniform mat4 projection;
+uniform mat4 model;
+uniform vec2 texScale;
+uniform vec2 texOffset;
+out vec2 UV;
+void main(){
+    UV = aUV * texScale + texOffset;
+    gl_Position = projection * model * vec4(aPos,0,1);
+}
+)glsl";
+
+const char *fsSrc = R"glsl(
+#version 330 core
+in vec2 UV;
+out vec4 Frag;
+uniform sampler2D spriteTex;
+uniform bool u_outline;
+uniform vec4 u_outlineColor;
+void main(){
+    if(u_outline) Frag = u_outlineColor;
+    else          Frag = texture(spriteTex,UV);
+}
+)glsl";
+
+static GLuint compileShader(GLenum t, const char *src)
+{
+    GLuint s = glCreateShader(t);
+    glShaderSource(s, 1, &src, nullptr);
+    glCompileShader(s);
+    GLint ok;
+    char log[512];
+    glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+    if (!ok)
+    {
+        glGetShaderInfoLog(s, 512, nullptr, log);
+        std::cerr << (t == GL_VERTEX_SHADER ? "VS" : "FS") << " error:\n"
+                  << log;
+    }
+    return s;
+}
+
+static GLuint createProgram()
+{
+    GLuint vs = compileShader(GL_VERTEX_SHADER, vsSrc);
+    GLuint fs = compileShader(GL_FRAGMENT_SHADER, fsSrc);
+    GLuint p = glCreateProgram();
+    glAttachShader(p, vs);
+    glAttachShader(p, fs);
+    glLinkProgram(p);
+    GLint ok;
+    char log[512];
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok)
+    {
+        glGetProgramInfoLog(p, 512, nullptr, log);
+        std::cerr << "Link error:\n"
+                  << log;
+    }
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    return p;
+}
+
+GLuint outlineVAO;
+void initOutline()
+{
+    float C[] = {
+        -0.5f, 0.5f,
+        0.5f, 0.5f,
+        0.5f, -0.5f,
+        -0.5f, -0.5f};
+    GLuint vbo;
+    glGenVertexArrays(1, &outlineVAO);
+    glGenBuffers(1, &vbo);
+    glBindVertexArray(outlineVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(C), C, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
+    glBindVertexArray(0);
+}
+
+int main()
+{
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    GLFWwindow *win = glfwCreateWindow(SCR_W, SCR_H, "IsometricTilemap", nullptr, nullptr);
+    if (!win)
+    {
+        std::cerr << "Failed to create GLFW window\n";
+        return -1;
+    }
+    glfwMakeContextCurrent(win);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cerr << "Failed to init GLAD\n";
+        return -1;
+    }
+
+    glViewport(0, 0, SCR_W, SCR_H);
+    GLuint shader = createProgram();
+    glUseProgram(shader);
+
+    glm::mat4 proj = glm::ortho(0.0f, float(SCR_W), 0.0f, float(SCR_H), -1.0f, 1.0f);
+    glUniformMatrix4fv(glGetUniformLocation(shader, "projection"),
+                       1, GL_FALSE, glm::value_ptr(proj));
+    glUniform1i(glGetUniformLocation(shader, "spriteTex"), 0);
+
+    initQuad();
+    initOutline();
+
+    GLuint tileset = loadTexture("resources/tileset.png");
+    const int nCols = 7, nRows = 1;
+    const float tileW = 128.0f, tileH = 64.0f;
+
+    float halfW = tileW * 0.5f;
+    float halfH = tileH * 0.5f;
+    float mapWpx = (MAP_W + MAP_H - 2) * halfW;
+    float mapHpx = (MAP_W + MAP_H - 2) * halfH;
+    glm::vec2 origin(SCR_W * 0.5f, SCR_H * 0.5f - mapHpx * 0.5f);
+
+    GLint locM = glGetUniformLocation(shader, "model");
+    GLint locTS = glGetUniformLocation(shader, "texScale");
+    GLint locTO = glGetUniformLocation(shader, "texOffset");
+    GLint locOL = glGetUniformLocation(shader, "u_outline");
+    GLint locCLR = glGetUniformLocation(shader, "u_outlineColor");
+
+    int ci = 0, cj = 0;
+    visited[ci][cj] = true;
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    while (!glfwWindowShouldClose(win))
+    {
+        glfwPollEvents();
+        int ni = ci, nj = cj;
+        if (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS)
+        {
+            ni--;
+            nj--;
+        }
+        if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS)
+        {
+            ni++;
+            nj++;
+        }
+        if (glfwGetKey(win, GLFW_KEY_D) == GLFW_PRESS)
+        {
+            ni++;
+            nj--;
+        }
+        if (glfwGetKey(win, GLFW_KEY_A) == GLFW_PRESS)
+        {
+            ni--;
+            nj++;
+        }
+
+        ci = glm::clamp(ni, 0, MAP_H - 1);
+        cj = glm::clamp(nj, 0, MAP_W - 1);
+        visited[ci][cj] = true;
+
+        glClearColor(0.2f, 0.2f, 0.2f, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glUniform1i(locOL, 0);
+
+        float dsx = 1.0f / float(nCols);
+        float dsy = 1.0f / float(nRows);
+
+        for (int i = 0; i < MAP_H; ++i)
+        {
+            for (int j = 0; j < MAP_W; ++j)
+            {
+                int idx = visited[i][j] ? PINK_TILE_INDEX : mapData[i][j];
+                float offx = idx * dsx;
+
+                float x = (i - j) * halfW + origin.x;
+                float y = (i + j) * halfH + origin.y;
+
+                glm::mat4 M = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
+                glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M));
+                glUniform2f(locTS, dsx, dsy);
+                glUniform2f(locTO, offx, 0.0f);
+
+                glBindTexture(GL_TEXTURE_2D, tileset);
+                glBindVertexArray(quadVAO);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+        }
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glUniform1i(locOL, 1);
+        glUniform4f(locCLR, 1, 1, 1, 1);
+        glLineWidth(2.0f);
+
+        glBindVertexArray(outlineVAO);
+        {
+            float x = (ci - cj) * halfW + origin.x;
+            float y = (ci + cj) * halfH + origin.y;
+            glm::mat4 M = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
+            glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M));
+            glDrawArrays(GL_LINE_LOOP, 0, 4);
+        }
+        glUniform1i(locOL, 0);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        glfwSwapBuffers(win);
+    }
+
+    glfwTerminate();
+    return 0;
+}
