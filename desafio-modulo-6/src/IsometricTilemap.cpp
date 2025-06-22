@@ -15,21 +15,21 @@ const uint SCR_W = 800, SCR_H = 600;
 const int MAP_H = 15;
 const int MAP_W = 15;
 int mapData[MAP_H][MAP_W] = {
-    {5, 5, 5, 4, 4, 0, 0, 1, 1, 1, 1, 1, 0, 0, 4},
-    {5, 5, 4, 4, 0, 0, 0, 1, 1, 1, 1, 1, 0, 4, 4},
-    {5, 4, 4, 0, 0, 0, 0, 1, 1, 1, 1, 0, 4, 4, 4},
-    {4, 4, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 4, 4, 5},
-    {4, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 4, 5},
-    {0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 4, 5},
-    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 4, 4},
-    {1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 0, 4},
-    {1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 0},
-    {1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1},
-    {1, 1, 1, 2, 2, 2, 3, 3, 3, 2, 2, 2, 2, 2, 1},
-    {1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 1, 1},
-    {1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 1},
-    {2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2},
-    {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}};
+        {5, 5, 5, 4, 4, 0, 0, 1, 1, 1, 1, 1, 0, 0, 4},
+        {5, 5, 4, 4, 0, 0, 0, 1, 1, 1, 1, 1, 0, 4, 4},
+        {5, 4, 4, 0, 0, 0, 0, 1, 1, 1, 1, 0, 4, 4, 4},
+        {4, 4, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 4, 4, 5},
+        {4, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 4, 5},
+        {0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 4, 5},
+        {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 4, 4},
+        {1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 0, 4},
+        {1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 0},
+        {1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1},
+        {1, 1, 1, 2, 2, 2, 3, 3, 3, 2, 2, 2, 2, 2, 1},
+        {1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 1, 1},
+        {1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 1},
+        {2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2},
+        {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}};
 
 const int PINK_TILE_INDEX = 6;
 
@@ -79,12 +79,12 @@ GLuint quadVAO;
 void initQuad()
 {
     float V[] = {
-        -0.5f, 0.5f, 0.0f, 1.0f,
-        0.5f, -0.5f, 1.0f, 0.0f,
-        -0.5f, -0.5f, 0.0f, 0.0f,
-        -0.5f, 0.5f, 0.0f, 1.0f,
-        0.5f, 0.5f, 1.0f, 1.0f,
-        0.5f, -0.5f, 1.0f, 0.0f};
+            -0.5f, 0.5f, 0.0f, 1.0f,
+            0.5f, -0.5f, 1.0f, 0.0f,
+            -0.5f, -0.5f, 0.0f, 0.0f,
+            -0.5f, 0.5f, 0.0f, 1.0f,
+            0.5f, 0.5f, 1.0f, 1.0f,
+            0.5f, -0.5f, 1.0f, 0.0f};
     GLuint VBO;
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &VBO);
@@ -169,10 +169,10 @@ GLuint outlineVAO;
 void initOutline()
 {
     float C[] = {
-        -0.5f, 0.5f,
-        0.5f, 0.5f,
-        0.5f, -0.5f,
-        -0.5f, -0.5f};
+            -0.5f, 0.5f,
+            0.5f, 0.5f,
+            0.5f, -0.5f,
+            -0.5f, -0.5f};
     GLuint vbo;
     glGenVertexArrays(1, &outlineVAO);
     glGenBuffers(1, &vbo);
@@ -209,9 +209,11 @@ int main()
     GLuint shader = createProgram();
     glUseProgram(shader);
 
+    // A projeção inicial será a mesma, mas vamos ajustá-la no loop
     glm::mat4 proj = glm::ortho(0.0f, float(SCR_W), 0.0f, float(SCR_H), -1.0f, 1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(shader, "projection"),
-                       1, GL_FALSE, glm::value_ptr(proj));
+    GLint locP = glGetUniformLocation(shader, "projection"); // Obter o local do uniform da projeção
+    glUniformMatrix4fv(locP, 1, GL_FALSE, glm::value_ptr(proj));
+
     glUniform1i(glGetUniformLocation(shader, "spriteTex"), 0);
 
     initQuad();
@@ -223,9 +225,10 @@ int main()
 
     float halfW = tileW * 0.5f;
     float halfH = tileH * 0.5f;
-    float mapWpx = (MAP_W + MAP_H - 2) * halfW;
-    float mapHpx = (MAP_W + MAP_H - 2) * halfH;
-    glm::vec2 origin(SCR_W * 0.5f, SCR_H * 0.5f - mapHpx * 0.5f);
+
+    // A origem inicial do mapa pode ser considerada (0,0) no sistema de coordenadas do mapa,
+    // pois a câmera agora irá centralizar a visão.
+    glm::vec2 mapOriginOffset(0.0f, 0.0f);
 
     GLint locM = glGetUniformLocation(shader, "model");
     GLint locTS = glGetUniformLocation(shader, "texScale");
@@ -280,6 +283,22 @@ int main()
             prevKeys[i] = g_keysPressed[i];
         }
 
+        // --- CÁLCULO DA POSIÇÃO ALVO DA CÂMERA ---
+        // Calcula a posição em pixels do tile que deve ser seguido
+        float targetX = (ci - cj) * halfW + mapOriginOffset.x;
+        float targetY = (ci + cj) * halfH + mapOriginOffset.y;
+
+        // Calcula o deslocamento necessário para centralizar o targetX, targetY na tela
+        float offsetX = (SCR_W * 0.5f) - targetX;
+        float offsetY = (SCR_H * 0.5f) - targetY;
+
+        // Atualiza a matriz de projeção para incluir o deslocamento da câmera
+        // A projeção agora mapeia a janela visível do mundo para a tela
+        proj = glm::ortho(0.0f - offsetX, float(SCR_W) - offsetX, 0.0f - offsetY, float(SCR_H) - offsetY, -1.0f, 1.0f);
+        glUniformMatrix4fv(locP, 1, GL_FALSE, glm::value_ptr(proj));
+        // --- FIM DO CÁLCULO DA CÂMERA ---
+
+
         glClearColor(0.2f, 0.2f, 0.2f, 1);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -296,8 +315,10 @@ int main()
                 int idx = (i == ci && j == cj) ? PINK_TILE_INDEX : mapData[i][j];
                 float offx = idx * dsx;
 
-                float x = (i - j) * halfW + origin.x;
-                float y = (i + j) * halfH + origin.y;
+                // A posição do tile no "mundo" continua a mesma,
+                // a câmera é que se move.
+                float x = (i - j) * halfW + mapOriginOffset.x;
+                float y = (i + j) * halfH + mapOriginOffset.y;
 
                 glm::mat4 M = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
                 glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M));
@@ -317,8 +338,8 @@ int main()
 
         glBindVertexArray(outlineVAO);
         {
-            float x = (ci - cj) * halfW + origin.x;
-            float y = (ci + cj) * halfH + origin.y;
+            float x = (ci - cj) * halfW + mapOriginOffset.x;
+            float y = (ci + cj) * halfH + mapOriginOffset.y;
             glm::mat4 M = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
             glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M));
             glDrawArrays(GL_LINE_LOOP, 0, 4);
