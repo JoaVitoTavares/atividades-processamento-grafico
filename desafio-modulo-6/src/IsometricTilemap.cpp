@@ -36,7 +36,7 @@ int mapData[MAP_H][MAP_W] = {
 
 const int PINK_TILE_INDEX = 6;
 
-bool visited[MAP_H][MAP_W] = {false};
+// bool visited[MAP_H][MAP_W] = {false};
 
 GLuint loadTexture(const char *path)
 {
@@ -220,7 +220,7 @@ int main()
     GLint locCLR = glGetUniformLocation(shader, "u_outlineColor");
 
     int ci = 0, cj = 0;
-    visited[ci][cj] = true;
+    // visited[ci][cj] = true;
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -252,7 +252,7 @@ int main()
 
         ci = glm::clamp(ni, 0, MAP_H - 1);
         cj = glm::clamp(nj, 0, MAP_W - 1);
-        visited[ci][cj] = true;
+        // visited[ci][cj] = true;
 
         glClearColor(0.2f, 0.2f, 0.2f, 1);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -267,7 +267,7 @@ int main()
         {
             for (int j = 0; j < MAP_W; ++j)
             {
-                int idx = visited[i][j] ? PINK_TILE_INDEX : mapData[i][j];
+                int idx = (i == ci && j == cj) ? PINK_TILE_INDEX : mapData[i][j];
                 float offx = idx * dsx;
 
                 float x = (i - j) * halfW + origin.x;
