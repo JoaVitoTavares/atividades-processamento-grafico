@@ -1,5 +1,3 @@
-// IsometricTilemap.cpp
-// Desenho e navegação em tilemap isométrico (diamond) em OpenGL 3.3
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -36,7 +34,23 @@ int mapData[MAP_H][MAP_W] = {
 
 const int PINK_TILE_INDEX = 6;
 
-// bool visited[MAP_H][MAP_W] = {false};
+bool g_keysPressed[GLFW_KEY_LAST + 1] = {false};
+
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key >= 0 && key <= GLFW_KEY_LAST)
+    {
+        if (action == GLFW_PRESS)
+        {
+            g_keysPressed[key] = true;
+        }
+        else if (action == GLFW_RELEASE)
+        {
+            g_keysPressed[key] = false;
+        }
+    }
+}
 
 GLuint loadTexture(const char *path)
 {
@@ -191,6 +205,9 @@ int main()
         return -1;
     }
 
+
+    glfwSetKeyCallback(win, key_callback);
+
     glViewport(0, 0, SCR_W, SCR_H);
     GLuint shader = createProgram();
     glUseProgram(shader);
@@ -220,7 +237,9 @@ int main()
     GLint locCLR = glGetUniformLocation(shader, "u_outlineColor");
 
     int ci = 0, cj = 0;
-    // visited[ci][cj] = true;
+
+    // Store previous key states to detect single presses
+    bool prevKeys[GLFW_KEY_LAST + 1] = {false};
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -229,30 +248,37 @@ int main()
     {
         glfwPollEvents();
         int ni = ci, nj = cj;
-        if (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS)
+
+        // Check for key presses only when the key was just pressed
+        if (g_keysPressed[GLFW_KEY_S] && !prevKeys[GLFW_KEY_S])
         {
             ni--;
             nj--;
         }
-        if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS)
+        if (g_keysPressed[GLFW_KEY_W] && !prevKeys[GLFW_KEY_W])
         {
             ni++;
             nj++;
         }
-        if (glfwGetKey(win, GLFW_KEY_D) == GLFW_PRESS)
+        if (g_keysPressed[GLFW_KEY_D] && !prevKeys[GLFW_KEY_D])
         {
             ni++;
             nj--;
         }
-        if (glfwGetKey(win, GLFW_KEY_A) == GLFW_PRESS)
+        if (g_keysPressed[GLFW_KEY_A] && !prevKeys[GLFW_KEY_A])
         {
             ni--;
             nj++;
         }
 
+        // Clamp new coordinates and update current coordinates
         ci = glm::clamp(ni, 0, MAP_H - 1);
         cj = glm::clamp(nj, 0, MAP_W - 1);
-        // visited[ci][cj] = true;
+
+        // Update previous key states
+        for (int i = 0; i <= GLFW_KEY_LAST; ++i) {
+            prevKeys[i] = g_keysPressed[i];
+        }
 
         glClearColor(0.2f, 0.2f, 0.2f, 1);
         glClear(GL_COLOR_BUFFER_BIT);
