@@ -236,7 +236,9 @@ int main()
     GLint locOL = glGetUniformLocation(shader, "u_outline");
     GLint locCLR = glGetUniformLocation(shader, "u_outlineColor");
 
-    int ci = 0, cj = 0;
+    // Initialize ci and cj to the center of the map
+    int ci = MAP_H / 2;
+    int cj = MAP_W / 2;
 
     // Store previous key states to detect single presses
     bool prevKeys[GLFW_KEY_LAST + 1] = {false};
