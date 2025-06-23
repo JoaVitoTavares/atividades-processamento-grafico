@@ -32,6 +32,7 @@ int mapData[MAP_H][MAP_W] = {
         {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}};
 
 const int PINK_TILE_INDEX = 6;
+const int IMPASSABLE_TILE = 5; // Definindo o valor do tile intransponível
 
 bool g_keysPressed[GLFW_KEY_LAST + 1] = {false};
 
@@ -209,9 +210,8 @@ int main()
     GLuint shader = createProgram();
     glUseProgram(shader);
 
-    // A projeção inicial será a mesma, mas vamos ajustá-la no loop
     glm::mat4 proj = glm::ortho(0.0f, float(SCR_W), 0.0f, float(SCR_H), -1.0f, 1.0f);
-    GLint locP = glGetUniformLocation(shader, "projection"); // Obter o local do uniform da projeção
+    GLint locP = glGetUniformLocation(shader, "projection");
     glUniformMatrix4fv(locP, 1, GL_FALSE, glm::value_ptr(proj));
 
     glUniform1i(glGetUniformLocation(shader, "spriteTex"), 0);
@@ -226,8 +226,6 @@ int main()
     float halfW = tileW * 0.5f;
     float halfH = tileH * 0.5f;
 
-    // A origem inicial do mapa pode ser considerada (0,0) no sistema de coordenadas do mapa,
-    // pois a câmera agora irá centralizar a visão.
     glm::vec2 mapOriginOffset(0.0f, 0.0f);
 
     GLint locM = glGetUniformLocation(shader, "model");
@@ -236,11 +234,9 @@ int main()
     GLint locOL = glGetUniformLocation(shader, "u_outline");
     GLint locCLR = glGetUniformLocation(shader, "u_outlineColor");
 
-    // Initialize ci and cj to the center of the map
     int ci = MAP_H / 2;
     int cj = MAP_W / 2;
 
-    // Store previous key states to detect single presses
     bool prevKeys[GLFW_KEY_LAST + 1] = {false};
 
     glEnable(GL_BLEND);
@@ -249,55 +245,46 @@ int main()
     while (!glfwWindowShouldClose(win))
     {
         glfwPollEvents();
-        int ni = ci, nj = cj;
 
-        // Check for key presses only when the key was just pressed
-        if (g_keysPressed[GLFW_KEY_S] && !prevKeys[GLFW_KEY_S])
-        {
-            ni--;
-            nj--;
-        }
-        if (g_keysPressed[GLFW_KEY_W] && !prevKeys[GLFW_KEY_W])
-        {
-            ni++;
-            nj++;
-        }
-        if (g_keysPressed[GLFW_KEY_D] && !prevKeys[GLFW_KEY_D])
-        {
-            ni++;
-            nj--;
-        }
-        if (g_keysPressed[GLFW_KEY_A] && !prevKeys[GLFW_KEY_A])
-        {
-            ni--;
-            nj++;
-        }
+        // --- INÍCIO DA LÓGICA DE MOVIMENTO E COLISÃO ---
+        int ni = ci;
+        int nj = cj;
 
-        // Clamp new coordinates and update current coordinates
-        ci = glm::clamp(ni, 0, MAP_H - 1);
-        cj = glm::clamp(nj, 0, MAP_W - 1);
+        if (g_keysPressed[GLFW_KEY_S] && !prevKeys[GLFW_KEY_S]) { ni--; nj--; }
+        if (g_keysPressed[GLFW_KEY_W] && !prevKeys[GLFW_KEY_W]) { ni++; nj++; }
+        if (g_keysPressed[GLFW_KEY_D] && !prevKeys[GLFW_KEY_D]) { ni++; nj--; }
+        if (g_keysPressed[GLFW_KEY_A] && !prevKeys[GLFW_KEY_A]) { ni--; nj++; }
 
-        // Update previous key states
+        // Verifica se a nova posição é diferente da atual para evitar cálculos desnecessários
+        if (ni != ci || nj != cj)
+        {
+            // 1. Verifica se a nova posição (ni, nj) está dentro dos limites do mapa
+            if (ni >= 0 && ni < MAP_H && nj >= 0 && nj < MAP_W)
+            {
+                // 2. Verifica se o tile na nova posição NÃO é um tile intransponível
+                if (mapData[ni][nj] != IMPASSABLE_TILE)
+                {
+                    // Se todas as verificações passaram, atualiza a posição
+                    ci = ni;
+                    cj = nj;
+                }
+            }
+        }
+        // --- FIM DA LÓGICA DE MOVIMENTO E COLISÃO ---
+
         for (int i = 0; i <= GLFW_KEY_LAST; ++i)
         {
             prevKeys[i] = g_keysPressed[i];
         }
 
-        // --- CÁLCULO DA POSIÇÃO ALVO DA CÂMERA ---
-        // Calcula a posição em pixels do tile que deve ser seguido
         float targetX = (ci - cj) * halfW + mapOriginOffset.x;
         float targetY = (ci + cj) * halfH + mapOriginOffset.y;
 
-        // Calcula o deslocamento necessário para centralizar o targetX, targetY na tela
         float offsetX = (SCR_W * 0.5f) - targetX;
         float offsetY = (SCR_H * 0.5f) - targetY;
 
-        // Atualiza a matriz de projeção para incluir o deslocamento da câmera
-        // A projeção agora mapeia a janela visível do mundo para a tela
         proj = glm::ortho(0.0f - offsetX, float(SCR_W) - offsetX, 0.0f - offsetY, float(SCR_H) - offsetY, -1.0f, 1.0f);
         glUniformMatrix4fv(locP, 1, GL_FALSE, glm::value_ptr(proj));
-        // --- FIM DO CÁLCULO DA CÂMERA ---
-
 
         glClearColor(0.2f, 0.2f, 0.2f, 1);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -315,8 +302,6 @@ int main()
                 int idx = (i == ci && j == cj) ? PINK_TILE_INDEX : mapData[i][j];
                 float offx = idx * dsx;
 
-                // A posição do tile no "mundo" continua a mesma,
-                // a câmera é que se move.
                 float x = (i - j) * halfW + mapOriginOffset.x;
                 float y = (i + j) * halfH + mapOriginOffset.y;
 
