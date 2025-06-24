@@ -12,14 +12,12 @@
 
 typedef unsigned int uint;
 const uint SCR_W = 800, SCR_H = 600;
-
-
 const int MAP_H = 15;
 const int MAP_W = 15;
 int mapData[MAP_H][MAP_W];
 
 const int PINK_TILE_INDEX = 6;
-const int IMPASSABLE_TILE = 5;
+const int IMPASSABLE_TILE = 5; // Definindo o valor do tile intransponível
 
 bool g_keysPressed[GLFW_KEY_LAST + 1] = {false};
 
@@ -180,19 +178,30 @@ bool loadMapFromFile(const std::string& filename) {
     }
 
     int fileMapH, fileMapW;
-    file >> fileMapH >> fileMapW; // Lê a altura e largura do arquivo
-
+    file >> fileMapH >> fileMapW;
 
     if (fileMapH != MAP_H || fileMapW != MAP_W) {
         std::cerr << "Aviso: Dimensoes do mapa no arquivo (" << fileMapH << "x" << fileMapW
                   << ") nao correspondem as dimensoes esperadas (" << MAP_H << "x" << MAP_W << ")." << std::endl;
     }
 
+    // Calcula o centro do mapa para validação de spawn
+    const int centerX = MAP_H / 2;
+    const int centerY = MAP_W / 2;
+
     for (int i = 0; i < MAP_H; ++i) {
         for (int j = 0; j < MAP_W; ++j) {
             if (!(file >> mapData[i][j])) {
                 std::cerr << "Erro: Falha ao ler o tile em [" << i << "][" << j << "] do arquivo." << std::endl;
                 return false;
+            }
+
+            // Validação: Não permitir IMPASSABLE_TILE (5) no centro do mapa
+            if (i == centerX && j == centerY && mapData[i][j] == IMPASSABLE_TILE) {
+                std::cerr << "Erro: A agua profunda (tile " << IMPASSABLE_TILE
+                          << ") nao pode ficar no centro do mapa [" << i << "][" << j
+                          << "], pois é onde o personagem da spawn." << std::endl;
+                return false; // Retorna false para indicar falha no carregamento
             }
         }
     }
@@ -224,9 +233,8 @@ int main()
 
     glfwSetKeyCallback(win, key_callback);
 
-    // Carrega os dados do mapa do arquivo
     if (!loadMapFromFile("map.txt")) {
-        return -1; // Sai do programa se o mapa não puder ser carregado
+        return -1;
     }
 
     glViewport(0, 0, SCR_W, SCR_H);
