@@ -17,7 +17,7 @@ const int MAP_W = 15;
 int mapData[MAP_H][MAP_W];
 
 const int PINK_TILE_INDEX = 6;
-const int IMPASSABLE_TILE = 5; // Definindo o valor do tile intransponível
+const int IMPASSABLE_TILE_DEEP_WATER = 5; // Definindo o valor do tile intransponível
 
 bool g_keysPressed[GLFW_KEY_LAST + 1] = {false};
 
@@ -197,8 +197,8 @@ bool loadMapFromFile(const std::string& filename) {
             }
 
             // Validação: Não permitir IMPASSABLE_TILE (5) no centro do mapa
-            if (i == centerX && j == centerY && mapData[i][j] == IMPASSABLE_TILE) {
-                std::cerr << "Erro: A agua profunda (tile " << IMPASSABLE_TILE
+            if (i == centerX && j == centerY && mapData[i][j] == IMPASSABLE_TILE_DEEP_WATER) {
+                std::cerr << "Erro: A agua profunda (tile " << IMPASSABLE_TILE_DEEP_WATER
                           << ") nao pode ficar no centro do mapa [" << i << "][" << j
                           << "], pois é onde o personagem da spawn." << std::endl;
                 return false; // Retorna false para indicar falha no carregamento
@@ -289,7 +289,7 @@ int main()
         {
             if (ni >= 0 && ni < MAP_H && nj >= 0 && nj < MAP_W)
             {
-                if (mapData[ni][nj] != IMPASSABLE_TILE)
+                if (mapData[ni][nj] != IMPASSABLE_TILE_DEEP_WATER)
                 {
                     ci = ni;
                     cj = nj;
