@@ -8,31 +8,18 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <iostream>
+#include <fstream>
 
 typedef unsigned int uint;
 const uint SCR_W = 800, SCR_H = 600;
 
+
 const int MAP_H = 15;
 const int MAP_W = 15;
-int mapData[MAP_H][MAP_W] = {
-        {5, 5, 5, 4, 4, 0, 0, 1, 1, 1, 1, 1, 0, 0, 4},
-        {5, 5, 4, 4, 0, 0, 0, 1, 1, 1, 1, 1, 0, 4, 4},
-        {5, 4, 4, 0, 0, 0, 0, 1, 1, 1, 1, 0, 4, 4, 4},
-        {4, 4, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 4, 4, 5},
-        {4, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 4, 5},
-        {0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 4, 5},
-        {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 4, 4},
-        {1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 0, 4},
-        {1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 0},
-        {1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1},
-        {1, 1, 1, 2, 2, 2, 3, 3, 3, 2, 2, 2, 2, 2, 1},
-        {1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 1, 1},
-        {1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 1},
-        {2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2},
-        {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}};
+int mapData[MAP_H][MAP_W];
 
 const int PINK_TILE_INDEX = 6;
-const int IMPASSABLE_TILE = 5; // Definindo o valor do tile intransponível
+const int IMPASSABLE_TILE = 5;
 
 bool g_keysPressed[GLFW_KEY_LAST + 1] = {false};
 
@@ -185,6 +172,37 @@ void initOutline()
     glBindVertexArray(0);
 }
 
+bool loadMapFromFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Erro: Nao foi possivel abrir o arquivo do mapa: " << filename << std::endl;
+        return false;
+    }
+
+    int fileMapH, fileMapW;
+    file >> fileMapH >> fileMapW; // Lê a altura e largura do arquivo
+
+
+    if (fileMapH != MAP_H || fileMapW != MAP_W) {
+        std::cerr << "Aviso: Dimensoes do mapa no arquivo (" << fileMapH << "x" << fileMapW
+                  << ") nao correspondem as dimensoes esperadas (" << MAP_H << "x" << MAP_W << ")." << std::endl;
+    }
+
+    for (int i = 0; i < MAP_H; ++i) {
+        for (int j = 0; j < MAP_W; ++j) {
+            if (!(file >> mapData[i][j])) {
+                std::cerr << "Erro: Falha ao ler o tile em [" << i << "][" << j << "] do arquivo." << std::endl;
+                return false;
+            }
+        }
+    }
+
+    file.close();
+    std::cout << "Mapa carregado com sucesso de: " << filename << std::endl;
+    return true;
+}
+
+
 int main()
 {
     glfwInit();
@@ -205,6 +223,11 @@ int main()
     }
 
     glfwSetKeyCallback(win, key_callback);
+
+    // Carrega os dados do mapa do arquivo
+    if (!loadMapFromFile("map.txt")) {
+        return -1; // Sai do programa se o mapa não puder ser carregado
+    }
 
     glViewport(0, 0, SCR_W, SCR_H);
     GLuint shader = createProgram();
@@ -246,7 +269,6 @@ int main()
     {
         glfwPollEvents();
 
-        // --- INÍCIO DA LÓGICA DE MOVIMENTO E COLISÃO ---
         int ni = ci;
         int nj = cj;
 
@@ -255,22 +277,17 @@ int main()
         if (g_keysPressed[GLFW_KEY_D] && !prevKeys[GLFW_KEY_D]) { ni++; nj--; }
         if (g_keysPressed[GLFW_KEY_A] && !prevKeys[GLFW_KEY_A]) { ni--; nj++; }
 
-        // Verifica se a nova posição é diferente da atual para evitar cálculos desnecessários
         if (ni != ci || nj != cj)
         {
-            // 1. Verifica se a nova posição (ni, nj) está dentro dos limites do mapa
             if (ni >= 0 && ni < MAP_H && nj >= 0 && nj < MAP_W)
             {
-                // 2. Verifica se o tile na nova posição NÃO é um tile intransponível
                 if (mapData[ni][nj] != IMPASSABLE_TILE)
                 {
-                    // Se todas as verificações passaram, atualiza a posição
                     ci = ni;
                     cj = nj;
                 }
             }
         }
-        // --- FIM DA LÓGICA DE MOVIMENTO E COLISÃO ---
 
         for (int i = 0; i <= GLFW_KEY_LAST; ++i)
         {
