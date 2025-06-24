@@ -16,8 +16,8 @@ const int MAP_H = 15;
 const int MAP_W = 15;
 int mapData[MAP_H][MAP_W];
 
-const int PINK_TILE_INDEX = 6;
-const int IMPASSABLE_TILE_DEEP_WATER = 5; // Definindo o valor do tile intransponível
+const int PINK_TILE_INDEX = 6; // Ainda pode ser útil para debug ou outros propósitos
+const int IMPASSABLE_TILE_DEEP_WATER = 5;
 
 bool g_keysPressed[GLFW_KEY_LAST + 1] = {false};
 
@@ -46,7 +46,15 @@ GLuint loadTexture(const char *path)
         std::cerr << "Failed to load " << path << "\n";
         return 0;
     }
-    GLenum fmt = (n == 3 ? GL_RGB : GL_RGBA);
+    GLenum fmt = (n == 3 ? GL_RGB : GL_RGBA); // Assume RGB se 3 canais, RGBA se 4 canais
+    if (n == 4) fmt = GL_RGBA; // Explicitamente definir para RGBA se houver canal alfa
+    else if (n == 3) fmt = GL_RGB;
+    else {
+        std::cerr << "Formato de imagem nao suportado (canais: " << n << ") para " << path << "\n";
+        stbi_image_free(data);
+        return 0;
+    }
+
     GLuint t;
     glGenTextures(1, &t);
     glBindTexture(GL_TEXTURE_2D, t);
@@ -65,12 +73,15 @@ GLuint quadVAO;
 void initQuad()
 {
     float V[] = {
-            -0.5f, 0.5f, 0.0f, 1.0f,
-            0.5f, -0.5f, 1.0f, 0.0f,
-            -0.5f, -0.5f, 0.0f, 0.0f,
-            -0.5f, 0.5f, 0.0f, 1.0f,
-            0.5f, 0.5f, 1.0f, 1.0f,
-            0.5f, -0.5f, 1.0f, 0.0f};
+            // Posição (x,y), Coordenadas de Textura (u,v)
+            -0.5f,  0.5f,  0.0f, 1.0f, // Top-left
+            0.5f, -0.5f,  1.0f, 0.0f, // Bottom-right
+            -0.5f, -0.5f,  0.0f, 0.0f, // Bottom-left
+
+            -0.5f,  0.5f,  0.0f, 1.0f, // Top-left
+            0.5f,  0.5f,  1.0f, 1.0f, // Top-right
+            0.5f, -0.5f,  1.0f, 0.0f  // Bottom-right
+    };
     GLuint VBO;
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &VBO);
@@ -107,8 +118,12 @@ uniform sampler2D spriteTex;
 uniform bool u_outline;
 uniform vec4 u_outlineColor;
 void main(){
+    // Para sprites com transparência, use discard para pixels totalmente transparentes
+    vec4 texColor = texture(spriteTex, UV);
+    if (texColor.a < 0.1) discard; // Descartar pixels quase transparentes
+
     if(u_outline) Frag = u_outlineColor;
-    else          Frag = texture(spriteTex,UV);
+    else          Frag = texColor;
 }
 )glsl";
 
@@ -185,7 +200,6 @@ bool loadMapFromFile(const std::string& filename) {
                   << ") nao correspondem as dimensoes esperadas (" << MAP_H << "x" << MAP_W << ")." << std::endl;
     }
 
-    // Calcula o centro do mapa para validação de spawn
     const int centerX = MAP_H / 2;
     const int centerY = MAP_W / 2;
 
@@ -196,12 +210,11 @@ bool loadMapFromFile(const std::string& filename) {
                 return false;
             }
 
-            // Validação: Não permitir IMPASSABLE_TILE (5) no centro do mapa
             if (i == centerX && j == centerY && mapData[i][j] == IMPASSABLE_TILE_DEEP_WATER) {
                 std::cerr << "Erro: A agua profunda (tile " << IMPASSABLE_TILE_DEEP_WATER
                           << ") nao pode ficar no centro do mapa [" << i << "][" << j
                           << "], pois é onde o personagem da spawn." << std::endl;
-                return false; // Retorna false para indicar falha no carregamento
+                return false;
             }
         }
     }
@@ -250,9 +263,18 @@ int main()
     initQuad();
     initOutline();
 
-    GLuint tileset = loadTexture("resources/tileset.png");
-    const int nCols = 7, nRows = 1;
-    const float tileW = 128.0f, tileH = 64.0f;
+    GLuint tileset = loadTexture("resources/tileset.png"); // Textura dos tiles do mapa
+    // AQUI É A LINHA QUE MUDOU:
+    GLuint playerSpriteSheet = loadTexture("resources/pngwing.com.png"); // Sua spritesheet do boneco
+
+    // Dimensões de um único sprite na spritesheet do jogador
+    // Baseado na imagem fornecida: 17 colunas, 7 linhas, sprite de ~24x32 pixels
+    const int playerSpriteCols = 17;
+    const int playerSpriteRows = 7;
+    const float playerSpriteW = 24.0f; // Largura de um único sprite
+    const float playerSpriteH = 32.0f; // Altura de um único sprite
+
+    const float tileW = 128.0f, tileH = 64.0f; // Dimensões dos tiles do mapa
 
     float halfW = tileW * 0.5f;
     float halfH = tileH * 0.5f;
@@ -272,6 +294,10 @@ int main()
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
+
+    const int nCols = 7;
+    const int nRows = 1;
 
     while (!glfwWindowShouldClose(win))
     {
@@ -312,27 +338,27 @@ int main()
         glUniformMatrix4fv(locP, 1, GL_FALSE, glm::value_ptr(proj));
 
         glClearColor(0.2f, 0.2f, 0.2f, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glUniform1i(locOL, 0);
 
-        float dsx = 1.0f / float(nCols);
-        float dsy = 1.0f / float(nRows);
+        float dsx_tile = 1.0f / float(nCols);
+        float dsy_tile = 1.0f / float(nRows);
 
         for (int i = 0; i < MAP_H; ++i)
         {
             for (int j = 0; j < MAP_W; ++j)
             {
-                int idx = (i == ci && j == cj) ? PINK_TILE_INDEX : mapData[i][j];
-                float offx = idx * dsx;
+                int idx = mapData[i][j];
+                float offx = idx * dsx_tile;
 
                 float x = (i - j) * halfW + mapOriginOffset.x;
                 float y = (i + j) * halfH + mapOriginOffset.y;
 
                 glm::mat4 M = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
                 glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M));
-                glUniform2f(locTS, dsx, dsy);
+                glUniform2f(locTS, dsx_tile, dsy_tile);
                 glUniform2f(locTO, offx, 0.0f);
 
                 glBindTexture(GL_TEXTURE_2D, tileset);
@@ -341,6 +367,28 @@ int main()
             }
         }
 
+        float playerX = (ci - cj) * halfW + mapOriginOffset.x;
+        float playerY = (ci + cj) * halfH + mapOriginOffset.y + (tileH * 0.25f);
+
+        int playerSpriteIndexX = 0;
+        int playerSpriteIndexY = 0;
+
+        float dsx_player = 1.0f / float(playerSpriteCols);
+        float dsy_player = 1.0f / float(playerSpriteRows);
+        float offx_player = playerSpriteIndexX * dsx_player;
+        float offy_player = playerSpriteIndexY * dsy_player;
+
+        glm::mat4 M_player = glm::translate(glm::mat4(1.0f), glm::vec3(playerX, playerY, 0.1f))
+                             * glm::scale(glm::mat4(1.0f), glm::vec3(playerSpriteW, playerSpriteH, 1));
+        glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_player));
+        glUniform2f(locTS, dsx_player, dsy_player);
+        glUniform2f(locTO, offx_player, offy_player);
+
+        glBindTexture(GL_TEXTURE_2D, playerSpriteSheet);
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glUniform1i(locOL, 1);
         glUniform4f(locCLR, 1, 1, 1, 1);
@@ -348,10 +396,10 @@ int main()
 
         glBindVertexArray(outlineVAO);
         {
-            float x = (ci - cj) * halfW + mapOriginOffset.x;
-            float y = (ci + cj) * halfH + mapOriginOffset.y;
-            glm::mat4 M = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
-            glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M));
+            float x_outline = (ci - cj) * halfW + mapOriginOffset.x;
+            float y_outline = (ci + cj) * halfH + mapOriginOffset.y;
+            glm::mat4 M_outline = glm::translate(glm::mat4(1.0f), glm::vec3(x_outline, y_outline, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
+            glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_outline));
             glDrawArrays(GL_LINE_LOOP, 0, 4);
         }
         glUniform1i(locOL, 0);
