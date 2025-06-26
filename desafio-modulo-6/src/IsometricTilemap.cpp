@@ -10,8 +10,9 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <random> // Para geração de números aleatórios
-#include <chrono> // Para seed de números aleatórios
+#include <random>     // Para geração de números aleatórios
+#include <chrono>     // Para seed de números aleatórios
+#include <algorithm>  // Para std::find
 
 typedef unsigned int uint;
 const uint SCR_W = 800, SCR_H = 600;
@@ -51,16 +52,21 @@ bool isGameOver = false; // Novo: Variável para controlar o estado do jogo
 struct GameItem {
     int gridX;
     int gridY;
-    int spriteIndex; // Índice do sprite dentro da spritesheet de itens
+    GLuint textureID; // Agora armazena o ID da textura OpenGL diretamente
     bool collected;   // Se o item foi coletado (para futura lógica)
 };
 
 std::vector<GameItem> gameItems;
-GLuint itemsSpriteSheet;
-const int ITEM_SPRITE_COLS = 10; // Colunas na sua spritesheet de itens
-const int ITEM_SPRITE_ROWS = 3;  // Linhas na sua spritesheet de itens
-const float ITEM_SINGLE_SPRITE_W = 32.0f; // Largura de um sprite individual de item
-const float ITEM_SINGLE_SPRITE_H = 32.0f; // Altura de um sprite individual de item
+
+// IDs das texturas para os cristais individuais
+GLuint darkRedCrystalTexture;
+GLuint whiteCrystalTexture;
+GLuint yellowCrystalTexture;
+
+// Ajuste os tamanhos para os cristais individuais, se necessário.
+// Assumindo que todos são do mesmo tamanho da spritesheet anterior para consistência inicial.
+const float ITEM_SINGLE_SPRITE_W = 32.0f; // Largura de um sprite individual de item (verifique com suas imagens)
+const float ITEM_SINGLE_SPRITE_H = 32.0f; // Altura de um sprite individual de item (verifique com suas imagens)
 
 
 // ===========================================
@@ -88,6 +94,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 // ===========================================
 // Carregamento de Texturas e Inicialização de Geometria
 // ===========================================
+// A função loadTexture permanece a mesma, pois carrega uma única imagem por vez.
 GLuint loadTexture(const char *path)
 {
     stbi_set_flip_vertically_on_load(true);
@@ -155,8 +162,8 @@ layout(location=0) in vec2 aPos;
 layout(location=1) in vec2 aUV;
 uniform mat4 projection;
 uniform mat4 model;
-uniform vec2 texScale;
-uniform vec2 texOffset;
+uniform vec2 texScale; // Mantemos para flexibilidade, mas será 1.0, 1.0 para itens individuais
+uniform vec2 texOffset; // Mantemos para flexibilidade, mas será 0.0, 0.0 para itens individuais
 out vec2 UV;
 void main(){
     UV = aUV * texScale + texOffset;
@@ -283,11 +290,18 @@ bool loadMapFromFile(const std::string& filename) {
 }
 
 void generateRandomItems() {
-    // Usar std::mt19937 para um gerador de números aleatórios mais robusto
     std::mt19937 rng(std::chrono::system_clock::now().time_since_epoch().count());
     std::uniform_int_distribution<int> distGridX(0, MAP_W - 1);
     std::uniform_int_distribution<int> distGridY(0, MAP_H - 1);
-    std::uniform_int_distribution<int> distSpriteIndex(0, ITEM_SPRITE_COLS * ITEM_SPRITE_ROWS - 1); // Escolhe qualquer sprite
+
+    // Lista de IDs de textura dos cristais
+    std::vector<GLuint> crystalTextures = {
+            darkRedCrystalTexture,
+            whiteCrystalTexture,
+            yellowCrystalTexture
+    };
+    std::uniform_int_distribution<int> distCrystalType(0, crystalTextures.size() - 1);
+
 
     const int numberOfItems = 10; // Número de itens a serem gerados
 
@@ -308,7 +322,8 @@ void generateRandomItems() {
             GameItem newItem;
             newItem.gridX = randX;
             newItem.gridY = randY;
-            newItem.spriteIndex = distSpriteIndex(rng);
+            // Atribui uma das texturas de cristal carregadas aleatoriamente
+            newItem.textureID = crystalTextures[distCrystalType(rng)];
             newItem.collected = false;
             gameItems.push_back(newItem);
         } else {
@@ -359,15 +374,20 @@ int main()
 
     GLuint tileset = loadTexture("resources/tileset.png");
     GLuint playerSpriteSheet = loadTexture("resources/Vampires2_Run_full.png");
-    itemsSpriteSheet = loadTexture("resources/Assets_texture_shadow_dark_source.png"); // Carrega a textura dos itens
+
+    // CARREGANDO AS NOVAS TEXTURAS INDIVIDUAIS DOS CRISTAIS
+    darkRedCrystalTexture = loadTexture("resources/Dark_red_ crystal1.png");
+    whiteCrystalTexture = loadTexture("resources/White_crystal1.png");
+    yellowCrystalTexture = loadTexture("resources/Yellow_crystal1.png");
 
     if (playerSpriteSheet == 0) {
         std::cerr << "Erro fatal: Nao foi possivel carregar a spritesheet do jogador (Vampires2_Run_full.png). Verifique o caminho e o ficheiro." << std::endl;
         glfwTerminate();
         return -1;
     }
-    if (itemsSpriteSheet == 0) {
-        std::cerr << "Erro fatal: Nao foi possivel carregar a spritesheet dos itens (Assets_texture_shadow_dark_source.png). Verifique o caminho e o ficheiro." << std::endl;
+    // Verificando se todas as texturas de cristal foram carregadas
+    if (darkRedCrystalTexture == 0 || whiteCrystalTexture == 0 || yellowCrystalTexture == 0) {
+        std::cerr << "Erro fatal: Nao foi possivel carregar uma ou mais texturas de cristal. Verifique os caminhos e os ficheiros." << std::endl;
         glfwTerminate();
         return -1;
     }
@@ -410,13 +430,12 @@ int main()
 
         glfwPollEvents();
 
-        if (!isGameOver) { // Novo: Somente processa entrada e lógica de movimento se o jogo não estiver em Game Over
+        if (!isGameOver) {
             int newPlayerGridX = playerGridX;
             int newPlayerGridY = playerGridY;
             bool playerAttemptedMove = false;
             int newPlayerAnimY = playerAnimationFrameY;
 
-            // Verifica a entrada de movimento e define a nova posição/linha de animação desejada
             if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // Nordeste
                 newPlayerGridY++; newPlayerGridX++;
                 newPlayerAnimY = 2;
@@ -439,40 +458,41 @@ int main()
                 g_keysHandled[GLFW_KEY_D] = true;
             }
 
-            // Aplica o movimento e atualiza a direção do sprite APENAS se o movimento foi tentado e válido
             if (playerAttemptedMove) {
-                // Checa limites do mapa
                 if (newPlayerGridX >= 0 && newPlayerGridX < MAP_W &&
                     newPlayerGridY >= 0 && newPlayerGridY < MAP_H)
                 {
-                    // Checa colisão com tiles intransitáveis
                     if (mapData[newPlayerGridY][newPlayerGridX] != IMPASSABLE_TILE_DEEP_WATER)
                     {
                         playerGridX = newPlayerGridX;
                         playerGridY = newPlayerGridY;
                         playerAnimationFrameY = newPlayerAnimY;
 
-                        // NOVO: Verificar se o jogador pisou em um tile de game over
                         if (mapData[playerGridY][playerGridX] == GAME_OVER_TILE) {
                             isGameOver = true;
                             std::cout << "Game Over! Voce tocou no tile " << GAME_OVER_TILE << "!" << std::endl;
                         }
+                        // Lógica de coleta de itens (adicional)
+                        for (auto& item : gameItems) {
+                            if (!item.collected && item.gridX == playerGridX && item.gridY == playerGridY) {
+                                item.collected = true;
+                                std::cout << "Item coletado!" << std::endl;
+                                // Adicione aqui qualquer lógica de pontuação, inventário, etc.
+                            }
+                        }
+
                     } else {
-                        // Movimento bloqueado, mas a animação de direção ainda deve ser atualizada
                         playerAnimationFrameY = newPlayerAnimY;
                     }
                 } else {
-                    // Fora dos limites, mas a animação de direção ainda deve ser atualizada
                     playerAnimationFrameY = newPlayerAnimY;
                 }
-                // Se o jogador tentou um movimento, mesmo que bloqueado, animamos
                 playerAnimationFrameX = (int)(currentTime / g_animationSpeed) % PLAYER_SPRITE_RUN_FRAMES;
             } else {
-                playerAnimationFrameX = 0; // Reinicia o quadro de animação para a pose de idle
+                playerAnimationFrameX = 0;
             }
         }
 
-        // Se o jogo acabou, limpa os eventos de teclado para evitar novos movimentos
         if (isGameOver) {
             for (int i = 0; i <= GLFW_KEY_LAST; ++i) {
                 g_keysPressed[i] = false;
@@ -480,9 +500,6 @@ int main()
             }
         }
 
-        // ===========================================
-        // Atualização da Câmera (Projeção) para seguir o jogador
-        // ===========================================
         float playerWorldX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
         float playerWorldY = (playerGridY + playerGridX) * halfH + mapOriginOffset.y;
 
@@ -529,10 +546,12 @@ int main()
         }
 
         // ===========================================
-        // Renderização dos Itens
+        // Renderização dos Itens (usando texturas individuais)
         // ===========================================
-        float dsx_item = ITEM_SINGLE_SPRITE_W / (ITEM_SINGLE_SPRITE_W * ITEM_SPRITE_COLS);
-        float dsy_item = ITEM_SINGLE_SPRITE_H / (ITEM_SINGLE_SPRITE_H * ITEM_SPRITE_ROWS);
+        // Para texturas individuais, texScale será 1.0, 1.0 e texOffset será 0.0, 0.0
+        // pois cada imagem é um sprite completo.
+        glUniform2f(locTS, 1.0f, 1.0f);
+        glUniform2f(locTO, 0.0f, 0.0f);
 
         for (const auto& item : gameItems) {
             if (!item.collected) { // Renderiza apenas se não foi coletado
@@ -540,16 +559,11 @@ int main()
                 float itemWorldY = (item.gridY + item.gridX) * halfH + mapOriginOffset.y + (tileH * 0.5f); // Ajuste para ficar em cima do tile
                 float itemZ = (item.gridY + item.gridX) * 0.001f + 0.2f; // Z maior que o tile, menor que o jogador
 
-                float offx_item = (float)(item.spriteIndex % ITEM_SPRITE_COLS) * dsx_item;
-                float offy_item = (float)(item.spriteIndex / ITEM_SPRITE_COLS) * dsy_item;
-
                 glm::mat4 M_item = glm::translate(glm::mat4(1.0f), glm::vec3(itemWorldX, itemWorldY, itemZ))
                                    * glm::scale(glm::mat4(1.0f), glm::vec3(ITEM_SINGLE_SPRITE_W, ITEM_SINGLE_SPRITE_H, 1));
                 glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_item));
-                glUniform2f(locTS, dsx_item, dsy_item);
-                glUniform2f(locTO, offx_item, offy_item);
 
-                glBindTexture(GL_TEXTURE_2D, itemsSpriteSheet);
+                glBindTexture(GL_TEXTURE_2D, item.textureID); // VINCULA A TEXTURA ESPECÍFICA DO ITEM
                 glBindVertexArray(quadVAO);
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
@@ -559,43 +573,42 @@ int main()
         // ===========================================
         // Renderização do Personagem (Vampiro)
         // ===========================================
-        // Só renderiza o jogador se o jogo não for Game Over, ou se você quiser mantê-lo visível no Game Over
         if (!isGameOver) {
-            float playerRenderX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
-            float playerRenderY = (playerGridY + playerGridX) * halfH + mapOriginOffset.y + (tileH * 0.25f);
-            float playerZ = (playerGridY + playerGridX) * 0.001f + 0.5f;
-
+            // Reajusta texScale e texOffset para a spritesheet do jogador
             const float dsx_player = playerSingleSpriteW / playerSpriteSheetTotalW;
             const float dsy_player = playerSingleSpriteH / playerSpriteSheetTotalH;
 
             float offx_player = playerAnimationFrameX * dsx_player;
             float offy_player = playerAnimationFrameY * dsy_player;
 
+            glUniform2f(locTS, dsx_player, dsy_player);
+            glUniform2f(locTO, offx_player, offy_player);
+
+            float playerRenderX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
+            float playerRenderY = (playerGridY + playerGridX) * halfH + mapOriginOffset.y + (tileH * 0.25f);
+            float playerZ = (playerGridY + playerGridX) * 0.001f + 0.5f;
+
             glm::mat4 M_player = glm::translate(glm::mat4(1.0f), glm::vec3(playerRenderX, playerRenderY, playerZ))
                                  * glm::scale(glm::mat4(1.0f), glm::vec3(playerSingleSpriteW, playerSingleSpriteH, 1));
             glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_player));
-            glUniform2f(locTS, dsx_player, dsy_player);
-            glUniform2f(locTO, offx_player, offy_player);
 
             glBindTexture(GL_TEXTURE_2D, playerSpriteSheet);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES, 0, 6);
-        } else {
-            // Opcional: Se isGameOver for true, você pode renderizar algo diferente aqui,
-            // como uma tela de Game Over ou o jogador em uma pose específica.
-            // Por enquanto, o jogador simplesmente não será mais renderizado.
         }
-
 
         // ===========================================
         // Renderização do Contorno do Tile do Jogador
         // ===========================================
-        // Só renderiza o contorno se o jogo não for Game Over
         if (!isGameOver) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glUniform1i(locOL, 1);
             glUniform4f(locCLR, 1, 1, 1, 1);
             glLineWidth(2.0f);
+
+            // Garante que texScale e texOffset estejam corretos para o contorno (sem textura)
+            glUniform2f(locTS, 1.0f, 1.0f);
+            glUniform2f(locTO, 0.0f, 0.0f);
 
             glBindVertexArray(outlineVAO);
             {
