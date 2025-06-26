@@ -34,7 +34,8 @@ float playerMoveSpeed = 1.0f; // Exemplo: 1 tile por "passo"
 
 // Estado da animação
 int playerAnimationFrameX = 0; // Coluna atual na spritesheet
-int playerAnimationFrameY = 0; // Linha atual na spritesheet (para diferentes direções, por exemplo)
+// Inicializa a direção do vampiro para "Sudoeste" (frente), que é a linha 2 da spritesheet.
+int playerAnimationFrameY = 2; // Linha inicial na spritesheet (para diferentes direções, por exemplo)
 double lastFrameTime = 0.0; // Tempo do último frame para controle da animação
 
 // Variáveis para controle de tempo para animação do jogador
@@ -369,45 +370,40 @@ int main()
 
         int newPlayerGridX = playerGridX;
         int newPlayerGridY = playerGridY;
-        bool playerMoved = false; // Flag para saber se o jogador tentou se mover
-        bool animating = false; // Flag para saber se a animação de corrida deve estar ativa
+        bool playerAttemptedMove = false; // Flag se *alguma* tecla de direção válida foi pressionada e não tratada
+        // A linha de animação do jogador (playerAnimationFrameY) manterá seu valor atual por padrão,
+        // só sendo alterada se uma nova tecla de movimento for pressionada.
+        int newPlayerAnimY = playerAnimationFrameY; // Armazena a linha de animação Y atual ou a nova linha se movendo.
 
-        // Lógica de Movimento e Animação
-        // Note: Para movimento "por célula", você pode querer um pequeno atraso entre os movimentos,
-        // ou usar g_keysHandled para que uma tecla só registre um movimento por pressionamento.
-        // Se você quiser movimento suave, precisaria de interpolação e não apenas atualização de grid.
-        if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // Mover para cima-direita no mapa isométrico (Nordeste)
-            newPlayerGridY++;
-            newPlayerGridX++;
-            playerAnimationFrameY = 1; // Corresponde à linha Nordeste na spritesheet do vampiro
-            playerMoved = true;
+        // Declaração da variável 'animating'
+        bool animating = false;
+
+        // Verifica a entrada de movimento e define a nova posição/linha de animação desejada
+        if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // Nordeste
+            newPlayerGridY++; newPlayerGridX++;
+            newPlayerAnimY = 2; // AGORA SUSA A SPRITE DA LINHA 2 (que era 'S' e 'frente/idle')
+            playerAttemptedMove = true;
             g_keysHandled[GLFW_KEY_W] = true;
-        }
-        if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // Mover para baixo-esquerda no mapa isométrico (Sudoeste)
-            newPlayerGridY--;
-            newPlayerGridX--;
-            playerAnimationFrameY = 2; // Corresponde à linha Sudoeste (frente) na spritesheet do vampiro
-            playerMoved = true;
+        } else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // Sudoeste (Frente)
+            newPlayerGridY--; newPlayerGridX--;
+            newPlayerAnimY = 3; // AGORA USA A SPRITE DA LINHA 3 (que era 'W')
+            playerAttemptedMove = true;
             g_keysHandled[GLFW_KEY_S] = true;
-        }
-        if (g_keysPressed[GLFW_KEY_A] && !g_keysHandled[GLFW_KEY_A]) { // Mover para baixo-direita no mapa isométrico (Sudeste)
-            newPlayerGridY--;
-            newPlayerGridX++;
-            playerAnimationFrameY = 3; // Corresponde à linha Sudeste na spritesheet do vampiro
-            playerMoved = true;
+        } else if (g_keysPressed[GLFW_KEY_A] && !g_keysHandled[GLFW_KEY_A]) { // Sudeste
+            newPlayerGridY--; newPlayerGridX++;
+            newPlayerAnimY = 1; // Sprite de Nordeste (permanece 'A')
+            playerAttemptedMove = true;
             g_keysHandled[GLFW_KEY_A] = true;
-        }
-        if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Mover para cima-esquerda no mapa isométrico (Noroeste)
-            newPlayerGridY++;
-            newPlayerGridX--;
-            playerAnimationFrameY = 0; // Corresponde à linha Noroeste (a sprite que você tinha antes) na spritesheet do vampiro
-            playerMoved = true;
+        } else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Noroeste (Lado)
+            newPlayerGridY++; newPlayerGridX--;
+            newPlayerAnimY = 0; // Sprite de Noroeste (permanece 'D')
+            playerAttemptedMove = true;
             g_keysHandled[GLFW_KEY_D] = true;
         }
 
-        if (playerMoved) {
-            animating = true;
-            // Verificar limites do mapa e colisões
+        // Aplica o movimento e atualiza a direção do sprite APENAS se o movimento foi tentado e válido
+        if (playerAttemptedMove) {
+            animating = true; // O jogador está ativamente a tentar mover-se
             if (newPlayerGridX >= 0 && newPlayerGridX < MAP_W &&
                 newPlayerGridY >= 0 && newPlayerGridY < MAP_H)
             {
@@ -415,17 +411,28 @@ int main()
                 {
                     playerGridX = newPlayerGridX;
                     playerGridY = newPlayerGridY;
+                    playerAnimationFrameY = newPlayerAnimY; // Somente atualiza Y se o movimento for bem-sucedido
+                } else {
+                    // Se o movimento for bloqueado, o sprite ainda muda para a direção tentada,
+                    // mas a posição não é atualizada.
+                    playerAnimationFrameY = newPlayerAnimY;
                 }
+            } else {
+                // Se fora dos limites, o sprite ainda muda para a direção tentada,
+                // mas a posição não é atualizada.
+                playerAnimationFrameY = newPlayerAnimY;
             }
+        } else {
+            // Nenhuma tecla de movimento está pressionada
+            animating = false;
+            playerAnimationFrameX = 0; // Reinicia o quadro de animação para a pose de idle
+            // playerAnimationFrameY RETÉM seu último valor definido por um movimento bem-sucedido,
+            // ou do seu valor inicial padrão (2).
         }
 
-        // Atualiza o frame da animação se o jogador estiver se movendo
+        // Atualiza o quadro de animação X se estiver animando
         if (animating) {
             playerAnimationFrameX = (int)(currentTime / g_animationSpeed) % PLAYER_SPRITE_RUN_FRAMES;
-        } else {
-            // Se não estiver se movendo, usa o frame 0 da animação "de frente" (linha 2)
-            playerAnimationFrameX = 0;
-            playerAnimationFrameY = 2; // Linha Sudoeste para "idle" (frente para a câmera)
         }
 
         // ===========================================
@@ -496,8 +503,8 @@ int main()
         float playerZ = (playerGridY + playerGridX) * 0.001f + 0.5f; // Garante que o jogador está acima do tile atual
 
         // Com base na sua spritesheet (Vampires2_Run_full.png - 7x4 de 64x64px cada quadro):
-        float dsx_player = playerSingleSpriteW / playerSpriteSheetTotalW; // Largura de um sprite / Largura total da spritesheet
-        float dsy_player = playerSingleSpriteH / playerSpriteSheetTotalH; // Altura de um sprite / Altura total da spritesheet
+        const float dsx_player = playerSingleSpriteW / playerSpriteSheetTotalW; // Largura de um sprite / Largura total da spritesheet
+        const float dsy_player = playerSingleSpriteH / playerSpriteSheetTotalH; // Altura de um sprite / Altura total da spritesheet
 
         float offx_player = playerAnimationFrameX * dsx_player;
         float offy_player = playerAnimationFrameY * dsy_player;
