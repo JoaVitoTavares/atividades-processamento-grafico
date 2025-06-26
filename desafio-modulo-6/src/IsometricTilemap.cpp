@@ -35,7 +35,9 @@ float playerMoveSpeed = 1.0f; // Exemplo: 1 tile por "passo"
 // Estado da animação
 int playerAnimationFrameX = 0; // Coluna atual na spritesheet
 // Inicializa a direção do vampiro para "Sudoeste" (frente), que é a linha 2 da spritesheet.
-int playerAnimationFrameY = 2; // Linha inicial na spritesheet (para diferentes direções, por exemplo)
+// ALTERAÇÃO AQUI: Definir playerAnimationFrameY para a linha da spritesheet que corresponde a "baixo".
+// Baseado na sua redefinição para a tecla 'S', a linha 3 agora representa "baixo" (sudoeste).
+int playerAnimationFrameY = 3; // Linha inicial na spritesheet para "para baixo"
 double lastFrameTime = 0.0; // Tempo do último frame para controle da animação
 
 // Variáveis para controle de tempo para animação do jogador
@@ -427,7 +429,7 @@ int main()
             animating = false;
             playerAnimationFrameX = 0; // Reinicia o quadro de animação para a pose de idle
             // playerAnimationFrameY RETÉM seu último valor definido por um movimento bem-sucedido,
-            // ou do seu valor inicial padrão (2).
+            // ou do seu valor inicial padrão (3, neste caso, para baixo).
         }
 
         // Atualiza o quadro de animação X se estiver animando
