@@ -9,7 +9,7 @@
 #include "stb_image.h"
 #include <iostream>
 #include <fstream>
-#include <vector> // Para armazenar os dados do mapa dinamicamente se necessário, mas para este caso, o array fixo funciona
+#include <vector>
 
 typedef unsigned int uint;
 const uint SCR_W = 800, SCR_H = 600;
@@ -17,44 +17,37 @@ const int MAP_H = 15;
 const int MAP_W = 15;
 int mapData[MAP_H][MAP_W];
 
-const int PINK_TILE_INDEX = 6; // Ainda pode ser útil para debug ou outros propósitos
+const int PINK_TILE_INDEX = 6;
 const int IMPASSABLE_TILE_DEEP_WATER = 5;
+const int GAME_OVER_TILE = 3; // Novo: Definindo o ID do tile de game over
 
 // ===========================================
 // Variáveis Globais do Jogador
 // ===========================================
-// Posição do jogador no grid do mapa
 int playerGridX = MAP_W / 2;
 int playerGridY = MAP_H / 2;
-
-// Velocidade de movimento do jogador (em tiles por segundo ou pixels por frame, ajuste conforme necessário)
-// Para movimento baseado em grid, isso pode ser menos relevante se o movimento for instantâneo de tile para tile.
-// Se quiser um movimento suave entre tiles, precisaria de interpolação.
-float playerMoveSpeed = 1.0f; // Exemplo: 1 tile por "passo"
-
-// Estado da animação
-int playerAnimationFrameX = 0; // Coluna atual na spritesheet
-// Inicializa a direção do vampiro para "Sudoeste" (frente), que é a linha 2 da spritesheet.
-// ALTERAÇÃO AQUI: Definir playerAnimationFrameY para a linha da spritesheet que corresponde a "baixo".
-// Baseado na sua redefinição para a tecla 'S', a linha 3 agora representa "baixo" (sudoeste).
-int playerAnimationFrameY = 3; // Linha inicial na spritesheet para "para baixo"
-double lastFrameTime = 0.0; // Tempo do último frame para controle da animação
+float playerMoveSpeed = 1.0f;
+int playerAnimationFrameX = 0;
+int playerAnimationFrameY = 3; // Linha inicial para "para baixo"
+double lastFrameTime = 0.0;
 
 // Variáveis para controle de tempo para animação do jogador
 double g_lastFrameTime = 0.0;
-float g_animationSpeed = 0.15f; // Segundos por quadro (quanto menor, mais rápida a animação)
-int g_currentAnimationFrame = 0; // Índice do quadro atual na animação de corrida (0 a 6 para o vampiro)
-int g_animationDirection = 0; // 0: para baixo, 1: para a esquerda, 2: para a direita, 3: para cima (ajustar conforme sua spritesheet)
+float g_animationSpeed = 0.15f;
+int g_currentAnimationFrame = 0;
+int g_animationDirection = 0;
 
-// A spritesheet do Vampiro que você forneceu tem 7 frames por linha para a corrida
 const int PLAYER_SPRITE_RUN_FRAMES = 7;
-const int PLAYER_SPRITE_ROWS = 4; // Ajuste se houver mais linhas para diferentes direções
+const int PLAYER_SPRITE_ROWS = 4;
+
+// Variável de estado do jogo
+bool isGameOver = false; // Novo: Variável para controlar o estado do jogo
 
 // ===========================================
 // Controle de Entrada
 // ===========================================
 bool g_keysPressed[GLFW_KEY_LAST + 1] = {false};
-bool g_keysHandled[GLFW_KEY_LAST + 1] = {false}; // Para evitar múltiplos movimentos por um único pressionar de tecla
+bool g_keysHandled[GLFW_KEY_LAST + 1] = {false};
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
@@ -67,7 +60,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
         else if (action == GLFW_RELEASE)
         {
             g_keysPressed[key] = false;
-            g_keysHandled[key] = false; // Resetar para permitir novo movimento ao soltar e pressionar novamente
+            g_keysHandled[key] = false;
         }
     }
 }
@@ -77,7 +70,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 // ===========================================
 GLuint loadTexture(const char *path)
 {
-    stbi_set_flip_vertically_on_load(true); // Imagens OpenGL são geralmente carregadas de baixo para cima
+    stbi_set_flip_vertically_on_load(true);
     int w, h, n;
     unsigned char *data = stbi_load(path, &w, &h, &n, 0);
     if (!data)
@@ -85,8 +78,8 @@ GLuint loadTexture(const char *path)
         std::cerr << "Failed to load " << path << "\n";
         return 0;
     }
-    GLenum fmt = (n == 3 ? GL_RGB : GL_RGBA); // Assume RGB se 3 canais, RGBA se 4 canais
-    if (n == 4) fmt = GL_RGBA; // Explicitamente definir para RGBA se houver canal alfa
+    GLenum fmt = (n == 3 ? GL_RGB : GL_RGBA);
+    if (n == 4) fmt = GL_RGBA;
     else if (n == 3) fmt = GL_RGB;
     else {
         std::cerr << "Formato de imagem nao suportado (canais: " << n << ") para " << path << "\n";
@@ -112,7 +105,6 @@ GLuint quadVAO;
 void initQuad()
 {
     float V[] = {
-            // Posição (x,y), Coordenadas de Textura (u,v)
             -0.5f,  0.5f,  0.0f, 1.0f, // Top-left
             0.5f, -0.5f,  1.0f, 0.0f, // Bottom-right
             -0.5f, -0.5f,  0.0f, 0.0f, // Bottom-left
@@ -160,9 +152,8 @@ uniform sampler2D spriteTex;
 uniform bool u_outline;
 uniform vec4 u_outlineColor;
 void main(){
-    // Para sprites com transparência, use discard para pixels totalmente transparentes
     vec4 texColor = texture(spriteTex, UV);
-    if (texColor.a < 0.05) discard; // Descartar pixels quase transparentes (ajustado para 0.05 para maior robustez)
+    if (texColor.a < 0.05) discard;
 
     if(u_outline) Frag = u_outlineColor;
     else          Frag = texColor;
@@ -243,13 +234,10 @@ bool loadMapFromFile(const std::string& filename) {
     if (fileMapH != MAP_H || fileMapW != MAP_W) {
         std::cerr << "Aviso: Dimensoes do mapa no arquivo (" << fileMapH << "x" << fileMapW
                   << ") nao correspondem as dimensoes esperadas (" << MAP_H << "x" << MAP_W << ")." << std::endl;
-        // Se as dimensões não corresponderem, você pode ajustar MAP_H e MAP_W ou decidir sair.
-        // Por enquanto, vamos usar as dimensões fixas e ler o máximo possível.
     }
 
-    // Define a posição inicial do jogador no centro do mapa
-    playerGridY = MAP_H / 2; // Linha (Y)
-    playerGridX = MAP_W / 2; // Coluna (X)
+    playerGridY = MAP_H / 2;
+    playerGridX = MAP_W / 2;
 
     for (int i = 0; i < MAP_H; ++i) {
         for (int j = 0; j < MAP_W; ++j) {
@@ -259,10 +247,11 @@ bool loadMapFromFile(const std::string& filename) {
             }
 
             // Garante que a posição inicial do jogador não seja um tile intransitável
-            if (i == playerGridY && j == playerGridX && mapData[i][j] == IMPASSABLE_TILE_DEEP_WATER) {
-                std::cerr << "Erro: A agua profunda (tile " << IMPASSABLE_TILE_DEEP_WATER
-                          << ") nao pode ficar no centro do mapa [" << i << "][" << j
-                          << "], pois é onde o personagem da spawn." << std::endl;
+            if (i == playerGridY && j == playerGridX &&
+                (mapData[i][j] == IMPASSABLE_TILE_DEEP_WATER || mapData[i][j] == GAME_OVER_TILE)) { // Modificado: Não iniciar em tile de game over
+                std::cerr << "Erro: O tile de inicio do personagem (" << mapData[i][j]
+                          << ") no centro do mapa [" << i << "][" << j
+                          << "] e intransitavel ou de game over. Por favor, ajuste o mapa." << std::endl;
                 return false;
             }
         }
@@ -295,7 +284,6 @@ int main()
 
     glfwSetKeyCallback(win, key_callback);
 
-    // Tentar carregar o mapa. Se falhar, sair.
     if (!loadMapFromFile("map.txt")) {
         return -1;
     }
@@ -304,7 +292,6 @@ int main()
     GLuint shader = createProgram();
     glUseProgram(shader);
 
-    // A projeção ortográfica será ajustada dinamicamente para seguir o jogador
     glm::mat4 proj = glm::ortho(0.0f, float(SCR_W), 0.0f, float(SCR_H), -1.0f, 1.0f);
     GLint locP = glGetUniformLocation(shader, "projection");
     glUniformMatrix4fv(locP, 1, GL_FALSE, glm::value_ptr(proj));
@@ -314,35 +301,26 @@ int main()
     initQuad();
     initOutline();
 
-    GLuint tileset = loadTexture("resources/tileset.png"); // Textura dos tiles do mapa
-    // Carregue a spritesheet do vampiro que você forneceu.
-    // Certifique-se de que o caminho esteja correto em seu projeto.
-    GLuint playerSpriteSheet = loadTexture("resources/Vampires2_Run_full.png"); // ALTERADO PARA full.png
+    GLuint tileset = loadTexture("resources/tileset.png");
+    GLuint playerSpriteSheet = loadTexture("resources/Vampires2_Run_full.png");
 
-    // Verificação de erro para o carregamento do sprite do jogador
     if (playerSpriteSheet == 0) {
         std::cerr << "Erro fatal: Nao foi possivel carregar a spritesheet do jogador (Vampires2_Run_full.png). Verifique o caminho e o ficheiro." << std::endl;
         glfwTerminate();
-        return -1; // Sair do programa se a textura essencial não for carregada
+        return -1;
     }
 
-    // Dimensões de um único sprite na spritesheet do jogador
-    // Baseado na imagem fornecida: Vampires2_Run_full.png
-    // Esta spritesheet parece ter quadros de 64x64 pixels.
-    const int playerSpriteSheetTotalW = 448; // 7 frames * 64px
-    const int playerSpriteSheetTotalH = 256; // 4 rows * 64px
+    const int playerSpriteSheetTotalW = 448;
+    const int playerSpriteSheetTotalH = 256;
 
-    // Largura e altura de um único sprite dentro da spritesheet
     const float playerSingleSpriteW = 64.0f;
     const float playerSingleSpriteH = 64.0f;
 
-    // O tamanho do tile do mapa permanece o mesmo
     const float tileW = 128.0f, tileH = 64.0f;
 
     float halfW = tileW * 0.5f;
     float halfH = tileH * 0.5f;
 
-    // Offset da origem do mapa para centralização ou ajuste visual
     glm::vec2 mapOriginOffset(0.0f, 0.0f);
 
     GLint locM = glGetUniformLocation(shader, "model");
@@ -353,14 +331,12 @@ int main()
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_DEPTH_TEST); // Garante que sprites mais "altos" sejam desenhados sobre os mais "baixos"
+    glEnable(GL_DEPTH_TEST);
 
-    // Inicializa o tempo para a animação
     g_lastFrameTime = glfwGetTime();
 
-    // Definição das dimensões do tileset do mapa
-    const int nCols = 7; // Número de colunas no seu tileset.png
-    const int nRows = 1; // Número de linhas no seu tileset.png
+    const int nCols = 7;
+    const int nRows = 1;
 
     while (!glfwWindowShouldClose(win))
     {
@@ -370,85 +346,85 @@ int main()
 
         glfwPollEvents();
 
-        int newPlayerGridX = playerGridX;
-        int newPlayerGridY = playerGridY;
-        bool playerAttemptedMove = false; // Flag se *alguma* tecla de direção válida foi pressionada e não tratada
-        // A linha de animação do jogador (playerAnimationFrameY) manterá seu valor atual por padrão,
-        // só sendo alterada se uma nova tecla de movimento for pressionada.
-        int newPlayerAnimY = playerAnimationFrameY; // Armazena a linha de animação Y atual ou a nova linha se movendo.
+        if (!isGameOver) { // Novo: Somente processa entrada e lógica de movimento se o jogo não estiver em Game Over
+            int newPlayerGridX = playerGridX;
+            int newPlayerGridY = playerGridY;
+            bool playerAttemptedMove = false;
+            int newPlayerAnimY = playerAnimationFrameY;
 
-        // Declaração da variável 'animating'
-        bool animating = false;
+            // Verifica a entrada de movimento e define a nova posição/linha de animação desejada
+            if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // Nordeste
+                newPlayerGridY++; newPlayerGridX++;
+                newPlayerAnimY = 2;
+                playerAttemptedMove = true;
+                g_keysHandled[GLFW_KEY_W] = true;
+            } else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // Sudoeste (Frente)
+                newPlayerGridY--; newPlayerGridX--;
+                newPlayerAnimY = 3;
+                playerAttemptedMove = true;
+                g_keysHandled[GLFW_KEY_S] = true;
+            } else if (g_keysPressed[GLFW_KEY_A] && !g_keysHandled[GLFW_KEY_A]) { // Sudeste
+                newPlayerGridY--; newPlayerGridX++;
+                newPlayerAnimY = 1;
+                playerAttemptedMove = true;
+                g_keysHandled[GLFW_KEY_A] = true;
+            } else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Noroeste (Lado)
+                newPlayerGridY++; newPlayerGridX--;
+                newPlayerAnimY = 0;
+                playerAttemptedMove = true;
+                g_keysHandled[GLFW_KEY_D] = true;
+            }
 
-        // Verifica a entrada de movimento e define a nova posição/linha de animação desejada
-        if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // Nordeste
-            newPlayerGridY++; newPlayerGridX++;
-            newPlayerAnimY = 2; // AGORA SUSA A SPRITE DA LINHA 2 (que era 'S' e 'frente/idle')
-            playerAttemptedMove = true;
-            g_keysHandled[GLFW_KEY_W] = true;
-        } else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // Sudoeste (Frente)
-            newPlayerGridY--; newPlayerGridX--;
-            newPlayerAnimY = 3; // AGORA USA A SPRITE DA LINHA 3 (que era 'W')
-            playerAttemptedMove = true;
-            g_keysHandled[GLFW_KEY_S] = true;
-        } else if (g_keysPressed[GLFW_KEY_A] && !g_keysHandled[GLFW_KEY_A]) { // Sudeste
-            newPlayerGridY--; newPlayerGridX++;
-            newPlayerAnimY = 1; // Sprite de Nordeste (permanece 'A')
-            playerAttemptedMove = true;
-            g_keysHandled[GLFW_KEY_A] = true;
-        } else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Noroeste (Lado)
-            newPlayerGridY++; newPlayerGridX--;
-            newPlayerAnimY = 0; // Sprite de Noroeste (permanece 'D')
-            playerAttemptedMove = true;
-            g_keysHandled[GLFW_KEY_D] = true;
-        }
-
-        // Aplica o movimento e atualiza a direção do sprite APENAS se o movimento foi tentado e válido
-        if (playerAttemptedMove) {
-            animating = true; // O jogador está ativamente a tentar mover-se
-            if (newPlayerGridX >= 0 && newPlayerGridX < MAP_W &&
-                newPlayerGridY >= 0 && newPlayerGridY < MAP_H)
-            {
-                if (mapData[newPlayerGridY][newPlayerGridX] != IMPASSABLE_TILE_DEEP_WATER)
+            // Aplica o movimento e atualiza a direção do sprite APENAS se o movimento foi tentado e válido
+            if (playerAttemptedMove) {
+                // Checa limites do mapa
+                if (newPlayerGridX >= 0 && newPlayerGridX < MAP_W &&
+                    newPlayerGridY >= 0 && newPlayerGridY < MAP_H)
                 {
-                    playerGridX = newPlayerGridX;
-                    playerGridY = newPlayerGridY;
-                    playerAnimationFrameY = newPlayerAnimY; // Somente atualiza Y se o movimento for bem-sucedido
+                    // Checa colisão com tiles intransitáveis
+                    if (mapData[newPlayerGridY][newPlayerGridX] != IMPASSABLE_TILE_DEEP_WATER)
+                    {
+                        playerGridX = newPlayerGridX;
+                        playerGridY = newPlayerGridY;
+                        playerAnimationFrameY = newPlayerAnimY;
+
+                        // NOVO: Verificar se o jogador pisou em um tile de game over
+                        if (mapData[playerGridY][playerGridX] == GAME_OVER_TILE) {
+                            isGameOver = true;
+                            std::cout << "Game Over! Voce tocou no tile " << GAME_OVER_TILE << "!" << std::endl;
+                        }
+                    } else {
+                        // Movimento bloqueado, mas a animação de direção ainda deve ser atualizada
+                        playerAnimationFrameY = newPlayerAnimY;
+                    }
                 } else {
-                    // Se o movimento for bloqueado, o sprite ainda muda para a direção tentada,
-                    // mas a posição não é atualizada.
+                    // Fora dos limites, mas a animação de direção ainda deve ser atualizada
                     playerAnimationFrameY = newPlayerAnimY;
                 }
+                // Se o jogador tentou um movimento, mesmo que bloqueado, animamos
+                playerAnimationFrameX = (int)(currentTime / g_animationSpeed) % PLAYER_SPRITE_RUN_FRAMES;
             } else {
-                // Se fora dos limites, o sprite ainda muda para a direção tentada,
-                // mas a posição não é atualizada.
-                playerAnimationFrameY = newPlayerAnimY;
+                playerAnimationFrameX = 0; // Reinicia o quadro de animação para a pose de idle
             }
-        } else {
-            // Nenhuma tecla de movimento está pressionada
-            animating = false;
-            playerAnimationFrameX = 0; // Reinicia o quadro de animação para a pose de idle
-            // playerAnimationFrameY RETÉM seu último valor definido por um movimento bem-sucedido,
-            // ou do seu valor inicial padrão (3, neste caso, para baixo).
         }
 
-        // Atualiza o quadro de animação X se estiver animando
-        if (animating) {
-            playerAnimationFrameX = (int)(currentTime / g_animationSpeed) % PLAYER_SPRITE_RUN_FRAMES;
+        // Se o jogo acabou, limpa os eventos de teclado para evitar novos movimentos
+        if (isGameOver) {
+            for (int i = 0; i <= GLFW_KEY_LAST; ++i) {
+                g_keysPressed[i] = false;
+                g_keysHandled[i] = false;
+            }
         }
 
         // ===========================================
         // Atualização da Câmera (Projeção) para seguir o jogador
         // ===========================================
-        // Calcular a posição isométrica do jogador no mundo
         float playerWorldX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
         float playerWorldY = (playerGridY + playerGridX) * halfH + mapOriginOffset.y;
 
-        // Ajustar o offset da câmera para centralizar o jogador
         float cameraOffsetX = (SCR_W * 0.5f) - playerWorldX;
         float cameraOffsetY = (SCR_H * 0.5f) - playerWorldY;
 
-        // Recriar a matriz de projeção com o offset da câmera
         proj = glm::ortho(0.0f - cameraOffsetX, float(SCR_W) - cameraOffsetX, 0.0f - cameraOffsetY, float(SCR_H) - cameraOffsetY, -1.0f, 1.0f);
         glUniformMatrix4fv(locP, 1, GL_FALSE, glm::value_ptr(proj));
 
@@ -456,7 +432,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glUniform1i(locOL, 0); // Desativa o contorno para tiles
+        glUniform1i(locOL, 0);
 
         // ===========================================
         // Renderização dos Tiles do Mapa
@@ -469,24 +445,18 @@ int main()
             for (int j = 0; j < MAP_W; ++j)
             {
                 int idx = mapData[i][j];
-                // Calcula as coordenadas de textura para o tile atual
-                // Certifique-se de que `idx` é válido para as dimensões do seu tileset
                 float offx_tile = (float)(idx % nCols) * dsx_tile;
                 float offy_tile = (float)(idx / nCols) * dsy_tile;
 
-                // Posição do tile no mundo isométrico
                 float x = (i - j) * halfW + mapOriginOffset.x;
                 float y = (i + j) * halfH + mapOriginOffset.y;
 
-                // Aumenta o Z para que tiles mais "altos" (em termos de Y no mapa isométrico) sejam desenhados sobre os mais "baixos"
-                // e para que o jogador seja desenhado sobre todos os tiles.
-                // O valor Z para o tile pode ser baseado em sua posição (i+j) para ordenar corretamente.
-                float tileZ = (i + j) * 0.001f; // Pequeno incremento para cada "linha" isométrica
+                float tileZ = (i + j) * 0.001f;
 
                 glm::mat4 M = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, tileZ)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
                 glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M));
                 glUniform2f(locTS, dsx_tile, dsy_tile);
-                glUniform2f(locTO, offx_tile, offy_tile); // Use offx_tile e offy_tile
+                glUniform2f(locTO, offx_tile, offy_tile);
 
                 glBindTexture(GL_TEXTURE_2D, tileset);
                 glBindVertexArray(quadVAO);
@@ -497,52 +467,55 @@ int main()
         // ===========================================
         // Renderização do Personagem (Vampiro)
         // ===========================================
-        // Posição isométrica do jogador
-        float playerRenderX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
-        // Ajuste Y para que a base do sprite do jogador esteja no centro do tile ou levemente acima
-        float playerRenderY = (playerGridY + playerGridX) * halfH + mapOriginOffset.y + (tileH * 0.25f);
-        // Z do jogador deve ser maior que o Z dos tiles para ser desenhado por cima
-        float playerZ = (playerGridY + playerGridX) * 0.001f + 0.5f; // Garante que o jogador está acima do tile atual
+        // Só renderiza o jogador se o jogo não for Game Over, ou se você quiser mantê-lo visível no Game Over
+        if (!isGameOver) {
+            float playerRenderX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
+            float playerRenderY = (playerGridY + playerGridX) * halfH + mapOriginOffset.y + (tileH * 0.25f);
+            float playerZ = (playerGridY + playerGridX) * 0.001f + 0.5f;
 
-        // Com base na sua spritesheet (Vampires2_Run_full.png - 7x4 de 64x64px cada quadro):
-        const float dsx_player = playerSingleSpriteW / playerSpriteSheetTotalW; // Largura de um sprite / Largura total da spritesheet
-        const float dsy_player = playerSingleSpriteH / playerSpriteSheetTotalH; // Altura de um sprite / Altura total da spritesheet
+            const float dsx_player = playerSingleSpriteW / playerSpriteSheetTotalW;
+            const float dsy_player = playerSingleSpriteH / playerSpriteSheetTotalH;
 
-        float offx_player = playerAnimationFrameX * dsx_player;
-        float offy_player = playerAnimationFrameY * dsy_player;
+            float offx_player = playerAnimationFrameX * dsx_player;
+            float offy_player = playerAnimationFrameY * dsy_player;
 
-        // Matriz de modelo para o jogador
-        glm::mat4 M_player = glm::translate(glm::mat4(1.0f), glm::vec3(playerRenderX, playerRenderY, playerZ))
-                             * glm::scale(glm::mat4(1.0f), glm::vec3(playerSingleSpriteW, playerSingleSpriteH, 1));
-        glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_player));
-        glUniform2f(locTS, dsx_player, dsy_player);
-        glUniform2f(locTO, offx_player, offy_player);
+            glm::mat4 M_player = glm::translate(glm::mat4(1.0f), glm::vec3(playerRenderX, playerRenderY, playerZ))
+                                 * glm::scale(glm::mat4(1.0f), glm::vec3(playerSingleSpriteW, playerSingleSpriteH, 1));
+            glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_player));
+            glUniform2f(locTS, dsx_player, dsy_player);
+            glUniform2f(locTO, offx_player, offy_player);
 
-        glBindTexture(GL_TEXTURE_2D, playerSpriteSheet);
-        glBindVertexArray(quadVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindTexture(GL_TEXTURE_2D, playerSpriteSheet);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        } else {
+            // Opcional: Se isGameOver for true, você pode renderizar algo diferente aqui,
+            // como uma tela de Game Over ou o jogador em uma pose específica.
+            // Por enquanto, o jogador simplesmente não será mais renderizado.
+        }
 
 
         // ===========================================
         // Renderização do Contorno do Tile do Jogador
         // ===========================================
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Mudar para modo linha para o contorno
-        glUniform1i(locOL, 1); // Ativar o contorno
-        glUniform4f(locCLR, 1, 1, 1, 1); // Cor do contorno (branco)
-        glLineWidth(2.0f); // Largura da linha do contorno
+        // Só renderiza o contorno se o jogo não for Game Over
+        if (!isGameOver) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            glUniform1i(locOL, 1);
+            glUniform4f(locCLR, 1, 1, 1, 1);
+            glLineWidth(2.0f);
 
-        glBindVertexArray(outlineVAO);
-        {
-            // Posição do contorno, no centro do tile do jogador
-            float x_outline = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
-            float y_outline = (playerGridY + playerGridX) * halfH + mapOriginOffset.y;
-            // O Z para o contorno deve ser ligeiramente maior que o Z do tile para aparecer sobre ele, mas abaixo do jogador
-            glm::mat4 M_outline = glm::translate(glm::mat4(1.0f), glm::vec3(x_outline, y_outline, (playerGridY + playerGridX) * 0.001f + 0.1f)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
-            glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_outline));
-            glDrawArrays(GL_LINE_LOOP, 0, 4);
+            glBindVertexArray(outlineVAO);
+            {
+                float x_outline = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
+                float y_outline = (playerGridY + playerGridX) * halfH + mapOriginOffset.y;
+                glm::mat4 M_outline = glm::translate(glm::mat4(1.0f), glm::vec3(x_outline, y_outline, (playerGridY + playerGridX) * 0.001f + 0.1f)) * glm::scale(glm::mat4(1.0f), glm::vec3(tileW, tileH, 1));
+                glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_outline));
+                glDrawArrays(GL_LINE_LOOP, 0, 4);
+            }
+            glUniform1i(locOL, 0);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
-        glUniform1i(locOL, 0); // Desativar o contorno novamente
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Voltar ao modo de preenchimento
 
         glfwSwapBuffers(win);
     }
