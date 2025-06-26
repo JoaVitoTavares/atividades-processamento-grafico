@@ -10,6 +10,8 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <random> // Para geração de números aleatórios
+#include <chrono> // Para seed de números aleatórios
 
 typedef unsigned int uint;
 const uint SCR_W = 800, SCR_H = 600;
@@ -42,6 +44,24 @@ const int PLAYER_SPRITE_ROWS = 4;
 
 // Variável de estado do jogo
 bool isGameOver = false; // Novo: Variável para controlar o estado do jogo
+
+// ===========================================
+// Estrutura para os Itens
+// ===========================================
+struct GameItem {
+    int gridX;
+    int gridY;
+    int spriteIndex; // Índice do sprite dentro da spritesheet de itens
+    bool collected;   // Se o item foi coletado (para futura lógica)
+};
+
+std::vector<GameItem> gameItems;
+GLuint itemsSpriteSheet;
+const int ITEM_SPRITE_COLS = 10; // Colunas na sua spritesheet de itens
+const int ITEM_SPRITE_ROWS = 3;  // Linhas na sua spritesheet de itens
+const float ITEM_SINGLE_SPRITE_W = 32.0f; // Largura de um sprite individual de item
+const float ITEM_SINGLE_SPRITE_H = 32.0f; // Altura de um sprite individual de item
+
 
 // ===========================================
 // Controle de Entrada
@@ -78,7 +98,7 @@ GLuint loadTexture(const char *path)
         std::cerr << "Failed to load " << path << "\n";
         return 0;
     }
-    GLenum fmt = (n == 3 ? GL_RGB : GL_RGBA);
+    GLenum fmt;
     if (n == 4) fmt = GL_RGBA;
     else if (n == 3) fmt = GL_RGB;
     else {
@@ -219,7 +239,7 @@ void initOutline()
 }
 
 // ===========================================
-// Carregamento do Mapa
+// Carregamento do Mapa e Geração de Itens
 // ===========================================
 bool loadMapFromFile(const std::string& filename) {
     std::ifstream file(filename);
@@ -262,6 +282,42 @@ bool loadMapFromFile(const std::string& filename) {
     return true;
 }
 
+void generateRandomItems() {
+    // Usar std::mt19937 para um gerador de números aleatórios mais robusto
+    std::mt19937 rng(std::chrono::system_clock::now().time_since_epoch().count());
+    std::uniform_int_distribution<int> distGridX(0, MAP_W - 1);
+    std::uniform_int_distribution<int> distGridY(0, MAP_H - 1);
+    std::uniform_int_distribution<int> distSpriteIndex(0, ITEM_SPRITE_COLS * ITEM_SPRITE_ROWS - 1); // Escolhe qualquer sprite
+
+    const int numberOfItems = 10; // Número de itens a serem gerados
+
+    for (int i = 0; i < numberOfItems; ++i) {
+        int randX = distGridX(rng);
+        int randY = distGridY(rng);
+
+        // Tenta encontrar um tile que não seja intransitável e não seja a posição inicial do jogador
+        int attempts = 0;
+        while ((mapData[randY][randX] == IMPASSABLE_TILE_DEEP_WATER || mapData[randY][randX] == GAME_OVER_TILE ||
+                (randX == playerGridX && randY == playerGridY)) && attempts < 100) { // Limita as tentativas para evitar loop infinito
+            randX = distGridX(rng);
+            randY = distGridY(rng);
+            attempts++;
+        }
+
+        if (attempts < 100) { // Se encontrou um lugar válido
+            GameItem newItem;
+            newItem.gridX = randX;
+            newItem.gridY = randY;
+            newItem.spriteIndex = distSpriteIndex(rng);
+            newItem.collected = false;
+            gameItems.push_back(newItem);
+        } else {
+            std::cerr << "Aviso: Nao foi possivel encontrar um local valido para gerar um item apos varias tentativas." << std::endl;
+        }
+    }
+    std::cout << "Gerados " << gameItems.size() << " itens aleatorios no mapa." << std::endl;
+}
+
 
 int main()
 {
@@ -269,7 +325,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow *win = glfwCreateWindow(SCR_W, SCR_H, "IsometricTilemap - Player Control", nullptr, nullptr);
+    GLFWwindow *win = glfwCreateWindow(SCR_W, SCR_H, "IsometricTilemap - Player Control & Items", nullptr, nullptr);
     if (!win)
     {
         std::cerr << "Failed to create GLFW window\n";
@@ -303,9 +359,15 @@ int main()
 
     GLuint tileset = loadTexture("resources/tileset.png");
     GLuint playerSpriteSheet = loadTexture("resources/Vampires2_Run_full.png");
+    itemsSpriteSheet = loadTexture("resources/Assets_texture_shadow_dark_source.png"); // Carrega a textura dos itens
 
     if (playerSpriteSheet == 0) {
         std::cerr << "Erro fatal: Nao foi possivel carregar a spritesheet do jogador (Vampires2_Run_full.png). Verifique o caminho e o ficheiro." << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    if (itemsSpriteSheet == 0) {
+        std::cerr << "Erro fatal: Nao foi possivel carregar a spritesheet dos itens (Assets_texture_shadow_dark_source.png). Verifique o caminho e o ficheiro." << std::endl;
         glfwTerminate();
         return -1;
     }
@@ -337,6 +399,8 @@ int main()
 
     const int nCols = 7;
     const int nRows = 1;
+
+    generateRandomItems(); // Gera os itens após o carregamento do mapa
 
     while (!glfwWindowShouldClose(win))
     {
@@ -463,6 +527,34 @@ int main()
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
         }
+
+        // ===========================================
+        // Renderização dos Itens
+        // ===========================================
+        float dsx_item = ITEM_SINGLE_SPRITE_W / (ITEM_SINGLE_SPRITE_W * ITEM_SPRITE_COLS);
+        float dsy_item = ITEM_SINGLE_SPRITE_H / (ITEM_SINGLE_SPRITE_H * ITEM_SPRITE_ROWS);
+
+        for (const auto& item : gameItems) {
+            if (!item.collected) { // Renderiza apenas se não foi coletado
+                float itemWorldX = (item.gridY - item.gridX) * halfW + mapOriginOffset.x;
+                float itemWorldY = (item.gridY + item.gridX) * halfH + mapOriginOffset.y + (tileH * 0.5f); // Ajuste para ficar em cima do tile
+                float itemZ = (item.gridY + item.gridX) * 0.001f + 0.2f; // Z maior que o tile, menor que o jogador
+
+                float offx_item = (float)(item.spriteIndex % ITEM_SPRITE_COLS) * dsx_item;
+                float offy_item = (float)(item.spriteIndex / ITEM_SPRITE_COLS) * dsy_item;
+
+                glm::mat4 M_item = glm::translate(glm::mat4(1.0f), glm::vec3(itemWorldX, itemWorldY, itemZ))
+                                   * glm::scale(glm::mat4(1.0f), glm::vec3(ITEM_SINGLE_SPRITE_W, ITEM_SINGLE_SPRITE_H, 1));
+                glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_item));
+                glUniform2f(locTS, dsx_item, dsy_item);
+                glUniform2f(locTO, offx_item, offy_item);
+
+                glBindTexture(GL_TEXTURE_2D, itemsSpriteSheet);
+                glBindVertexArray(quadVAO);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+        }
+
 
         // ===========================================
         // Renderização do Personagem (Vampiro)
