@@ -45,6 +45,7 @@ const int PLAYER_SPRITE_ROWS = 4;
 
 // Variável de estado do jogo
 bool isGameOver = false; // Novo: Variável para controlar o estado do jogo
+bool hasWon = false; // Novo: Variável para controlar se o jogador venceu
 
 // ===========================================
 // Estrutura para os Itens
@@ -333,6 +334,17 @@ void generateRandomItems() {
     std::cout << "Gerados " << gameItems.size() << " itens aleatorios no mapa." << std::endl;
 }
 
+// ===========================================
+// Nova função para verificar se todos os itens foram coletados
+// ===========================================
+bool areAllItemsCollected() {
+    for (const auto& item : gameItems) {
+        if (!item.collected) {
+            return false; // If an uncollected item is found, return false
+        }
+    }
+    return true; // All items have been collected
+}
 
 int main()
 {
@@ -422,6 +434,7 @@ int main()
 
     generateRandomItems(); // Gera os itens após o carregamento do mapa
 
+    // This is your main game loop. All game logic and rendering should happen inside this one loop.
     while (!glfwWindowShouldClose(win))
     {
         double currentTime = glfwGetTime();
@@ -430,59 +443,62 @@ int main()
 
         glfwPollEvents();
 
-        if (!isGameOver) {
+        // Game Logic: Only process input and update game state if the game is not over and not won
+        if (!isGameOver && !hasWon) {
             int newPlayerGridX = playerGridX;
             int newPlayerGridY = playerGridY;
             bool playerAttemptedMove = false;
             int newPlayerAnimY = playerAnimationFrameY;
 
-            if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // Nordeste
+            // Player movement input handling
+            if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // North-East
                 newPlayerGridY++; newPlayerGridX++;
-                newPlayerAnimY = 2;
+                newPlayerAnimY = 2; // Adjust animation row for this direction
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_W] = true;
             }
-            if (g_keysPressed[GLFW_KEY_E] && !g_keysHandled[GLFW_KEY_E]) { // Nordeste
+            if (g_keysPressed[GLFW_KEY_E] && !g_keysHandled[GLFW_KEY_E]) { // North-East (alternative for WASD-like feel)
                 newPlayerGridY++;
                 newPlayerAnimY = 2;
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_E] = true;
-            }else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // Sudoeste (Frente)
+            } else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // South-West (Forward)
                 newPlayerGridY--; newPlayerGridX--;
-                newPlayerAnimY = 3;
+                newPlayerAnimY = 3; // Adjust animation row for this direction
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_S] = true;
-            } else if (g_keysPressed[GLFW_KEY_A] && !g_keysHandled[GLFW_KEY_A]) { // Sudeste
+            } else if (g_keysPressed[GLFW_KEY_A] && !g_keysHandled[GLFW_KEY_A]) { // South-East
                 newPlayerGridY--; newPlayerGridX++;
-                newPlayerAnimY = 1;
+                newPlayerAnimY = 1; // Adjust animation row for this direction
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_A] = true;
-            }else if (g_keysPressed[GLFW_KEY_Q] && g_keysPressed[GLFW_KEY_Q]) { // Sudeste
-                 newPlayerGridX++;
+            } else if (g_keysPressed[GLFW_KEY_Q] && !g_keysHandled[GLFW_KEY_Q]) { // East (diagonal movement helper)
+                newPlayerGridX++; // This might need review for isometric movement with Q, E, Z, X
                 newPlayerAnimY = 1;
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_Q] = true;
             }
-            else if (g_keysPressed[GLFW_KEY_Z] && !g_keysHandled[GLFW_KEY_Z]) { // Noroeste (Lado)
-                newPlayerGridY--;
-                newPlayerAnimY = 1;
+            else if (g_keysPressed[GLFW_KEY_Z] && !g_keysHandled[GLFW_KEY_Z]) { // North-West (diagonal movement helper)
+                newPlayerGridY--; // This might need review for isometric movement with Q, E, Z, X
+                newPlayerAnimY = 1; // Assuming same animation row as 'A' or 'Q' for a similar direction
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_Z] = true;
             }
-            else if (g_keysPressed[GLFW_KEY_X] && !g_keysHandled[GLFW_KEY_X]) { // Noroeste (Lado)
-                newPlayerGridX--;
-                newPlayerAnimY = 3;
+            else if (g_keysPressed[GLFW_KEY_X] && !g_keysHandled[GLFW_KEY_X]) { // South-West (diagonal movement helper)
+                newPlayerGridX--; // This might need review for isometric movement with Q, E, Z, X
+                newPlayerAnimY = 3; // Assuming same animation row as 'S' or 'A' for a similar direction
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_X] = true;
             }
-            else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Noroeste (Lado)
+            else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // North-West
                 newPlayerGridY++; newPlayerGridX--;
-                newPlayerAnimY = 0;
+                newPlayerAnimY = 0; // Adjust animation row for this direction
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_D] = true;
             }
 
             if (playerAttemptedMove) {
+                // Check map boundaries and impassable tiles
                 if (newPlayerGridX >= 0 && newPlayerGridX < MAP_W &&
                     newPlayerGridY >= 0 && newPlayerGridY < MAP_H)
                 {
@@ -492,38 +508,48 @@ int main()
                         playerGridY = newPlayerGridY;
                         playerAnimationFrameY = newPlayerAnimY;
 
+                        // Check for Game Over tile
                         if (mapData[playerGridY][playerGridX] == GAME_OVER_TILE) {
                             isGameOver = true;
                             std::cout << "Game Over! Voce tocou no tile " << GAME_OVER_TILE << "!" << std::endl;
                         }
-                        // Lógica de coleta de itens (adicional)
+
+                        // Item collection logic
                         for (auto& item : gameItems) {
                             if (!item.collected && item.gridX == playerGridX && item.gridY == playerGridY) {
                                 item.collected = true;
                                 std::cout << "Item coletado!" << std::endl;
-                                // Adicione aqui qualquer lógica de pontuação, inventário, etc.
+                                // Check for win condition immediately after collecting an item
+                                if (areAllItemsCollected()) {
+                                    hasWon = true;
+                                    std::cout << "Parabens! Voce coletou todos os itens e venceu o jogo!" << std::endl;
+                                }
                             }
                         }
-
                     } else {
+                        // If movement is blocked, still update animation direction
                         playerAnimationFrameY = newPlayerAnimY;
                     }
                 } else {
+                    // If movement is out of bounds, still update animation direction
                     playerAnimationFrameY = newPlayerAnimY;
                 }
                 playerAnimationFrameX = (int)(currentTime / g_animationSpeed) % PLAYER_SPRITE_RUN_FRAMES;
             } else {
-                playerAnimationFrameX = 0;
+                playerAnimationFrameX = 0; // Reset to idle frame if no movement
             }
         }
 
-        if (isGameOver) {
+        // Disable input when the game is over or won
+        if (isGameOver || hasWon) {
             for (int i = 0; i <= GLFW_KEY_LAST; ++i) {
                 g_keysPressed[i] = false;
                 g_keysHandled[i] = false;
             }
+            // You could display a "Game Over" or "You Won!" message here in the future
         }
 
+        // Rendering code
         float playerWorldX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
         float playerWorldY = (playerGridY + playerGridX) * halfH + mapOriginOffset.y;
 
@@ -539,9 +565,7 @@ int main()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glUniform1i(locOL, 0);
 
-        // ===========================================
-        // Renderização dos Tiles do Mapa
-        // ===========================================
+        // Rendering Map Tiles
         float dsx_tile = 1.0f / float(nCols);
         float dsy_tile = 1.0f / float(nRows);
 
@@ -569,36 +593,29 @@ int main()
             }
         }
 
-        // ===========================================
-        // Renderização dos Itens (usando texturas individuais)
-        // ===========================================
-        // Para texturas individuais, texScale será 1.0, 1.0 e texOffset será 0.0, 0.0
-        // pois cada imagem é um sprite completo.
+        // Rendering Items
         glUniform2f(locTS, 1.0f, 1.0f);
         glUniform2f(locTO, 0.0f, 0.0f);
 
         for (const auto& item : gameItems) {
-            if (!item.collected) { // Renderiza apenas se não foi coletado
+            if (!item.collected) { // Render only if not collected
                 float itemWorldX = (item.gridY - item.gridX) * halfW + mapOriginOffset.x;
-                float itemWorldY = (item.gridY + item.gridX) * halfH + mapOriginOffset.y + (tileH * 0.5f); // Ajuste para ficar em cima do tile
-                float itemZ = (item.gridY + item.gridX) * 0.001f + 0.2f; // Z maior que o tile, menor que o jogador
+                float itemWorldY = (item.gridY + item.gridX) * halfH + mapOriginOffset.y + (tileH * 0.5f); // Adjust to sit on top of the tile
+                float itemZ = (item.gridY + item.gridX) * 0.001f + 0.2f; // Z-order: higher than tile, lower than player
 
                 glm::mat4 M_item = glm::translate(glm::mat4(1.0f), glm::vec3(itemWorldX, itemWorldY, itemZ))
                                    * glm::scale(glm::mat4(1.0f), glm::vec3(ITEM_SINGLE_SPRITE_W, ITEM_SINGLE_SPRITE_H, 1));
                 glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_item));
 
-                glBindTexture(GL_TEXTURE_2D, item.textureID); // VINCULA A TEXTURA ESPECÍFICA DO ITEM
+                glBindTexture(GL_TEXTURE_2D, item.textureID); // Bind the specific item texture
                 glBindVertexArray(quadVAO);
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
         }
 
 
-        // ===========================================
-        // Renderização do Personagem (Vampiro)
-        // ===========================================
-        if (!isGameOver) {
-            // Reajusta texScale e texOffset para a spritesheet do jogador
+        // Rendering Player Character
+        if (!isGameOver && !hasWon) { // Only render player if game is still active
             const float dsx_player = playerSingleSpriteW / playerSpriteSheetTotalW;
             const float dsy_player = playerSingleSpriteH / playerSpriteSheetTotalH;
 
@@ -621,16 +638,13 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
-        // ===========================================
-        // Renderização do Contorno do Tile do Jogador
-        // ===========================================
-        if (!isGameOver) {
+        // Rendering Player Tile Outline
+        if (!isGameOver && !hasWon) { // Only show outline if game is active
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glUniform1i(locOL, 1);
             glUniform4f(locCLR, 1, 1, 1, 1);
             glLineWidth(2.0f);
 
-            // Garante que texScale e texOffset estejam corretos para o contorno (sem textura)
             glUniform2f(locTS, 1.0f, 1.0f);
             glUniform2f(locTO, 0.0f, 0.0f);
 
