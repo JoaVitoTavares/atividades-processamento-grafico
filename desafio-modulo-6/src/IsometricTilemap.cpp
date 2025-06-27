@@ -441,7 +441,13 @@ int main()
                 newPlayerAnimY = 2;
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_W] = true;
-            } else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // Sudoeste (Frente)
+            }
+            if (g_keysPressed[GLFW_KEY_E] && !g_keysHandled[GLFW_KEY_E]) { // Nordeste
+                newPlayerGridY++;
+                newPlayerAnimY = 2;
+                playerAttemptedMove = true;
+                g_keysHandled[GLFW_KEY_E] = true;
+            }else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // Sudoeste (Frente)
                 newPlayerGridY--; newPlayerGridX--;
                 newPlayerAnimY = 3;
                 playerAttemptedMove = true;
@@ -451,7 +457,14 @@ int main()
                 newPlayerAnimY = 1;
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_A] = true;
-            } else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Noroeste (Lado)
+            }else if (g_keysPressed[GLFW_KEY_Q] && !g_keysHandled[GLFW_KEY_Q]) { // Sudeste
+                 newPlayerGridX++;
+                newPlayerAnimY = 1;
+                playerAttemptedMove = true;
+                g_keysHandled[GLFW_KEY_Q] = true;
+            }
+
+            else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Noroeste (Lado)
                 newPlayerGridY++; newPlayerGridX--;
                 newPlayerAnimY = 0;
                 playerAttemptedMove = true;
