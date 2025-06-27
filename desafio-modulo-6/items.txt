@@ -1,0 +1,12 @@
+# Coordenadas X, Y e tipo de textura do item
+# Tipos de textura (exemplo):
+# 0 = Dark Red Crystal
+# 1 = White Crystal
+# 2 = Yellow Crystal
+
+5 5 0   # Um cristal vermelho escuro em (5, 5)
+8 2 1   # Um cristal branco em (8, 2)
+1 10 2  # Um cristal amarelo em (1, 10)
+12 4 0  # Outro cristal vermelho escuro
+7 7 1
+3 1 2

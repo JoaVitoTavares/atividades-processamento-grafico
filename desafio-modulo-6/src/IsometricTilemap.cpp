@@ -10,9 +10,10 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <random>     // Para geração de números aleatórios
-#include <chrono>     // Para seed de números aleatórios
-#include <algorithm>  // Para std::find
+#include <random>       // Para geração de números aleatórios
+#include <chrono>       // Para seed de números aleatórios
+#include <algorithm>    // Para std::find
+#include <sstream>      // Para parsing de linhas
 
 typedef unsigned int uint;
 const uint SCR_W = 800, SCR_H = 600;
@@ -290,6 +291,78 @@ bool loadMapFromFile(const std::string& filename) {
     return true;
 }
 
+// Nova função para carregar itens de um arquivo
+bool loadItemsFromFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Erro: Nao foi possivel abrir o arquivo de itens: " << filename << std::endl;
+        return false;
+    }
+
+    std::string line;
+    int lineNumber = 0;
+    while (std::getline(file, line)) {
+        lineNumber++;
+        // Ignora linhas vazias ou comentários
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+
+        std::stringstream ss(line);
+        int gridX, gridY, textureType;
+        // Lê as coordenadas X, Y e o tipo de textura
+        if (!(ss >> gridX >> gridY >> textureType)) {
+            std::cerr << "Erro de formato na linha " << lineNumber << " do arquivo de itens: " << line << std::endl;
+            continue;
+        }
+
+        // Verifica se as coordenadas estão dentro dos limites do mapa
+        if (gridX < 0 || gridX >= MAP_W || gridY < 0 || gridY >= MAP_H) {
+            std::cerr << "Aviso: Item na linha " << lineNumber << " fora dos limites do mapa (" << gridX << ", " << gridY << "). Ignorando." << std::endl;
+            continue;
+        }
+
+        // Verifica se a posição do item não é intransitável ou a posição inicial do jogador
+        if (mapData[gridY][gridX] == IMPASSABLE_TILE_DEEP_WATER || mapData[gridY][gridX] == GAME_OVER_TILE ||
+            (gridX == playerGridX && gridY == playerGridY)) {
+            std::cerr << "Aviso: Item na linha " << lineNumber << " em posicao intransitavel ou na posicao do jogador (" << gridX << ", " << gridY << "). Ignorando." << std::endl;
+            continue;
+        }
+
+        GameItem newItem;
+        newItem.gridX = gridX;
+        newItem.gridY = gridY;
+        newItem.collected = false;
+
+        // Atribui a textura com base no textureType
+        switch (textureType) {
+            case 0: // Exemplo: Tipo 0 para Dark Red Crystal
+                newItem.textureID = darkRedCrystalTexture;
+                break;
+            case 1: // Exemplo: Tipo 1 para White Crystal
+                newItem.textureID = whiteCrystalTexture;
+                break;
+            case 2: // Exemplo: Tipo 2 para Yellow Crystal
+                newItem.textureID = yellowCrystalTexture;
+                break;
+            default:
+                std::cerr << "Aviso: Tipo de textura invalido (" << textureType << ") na linha " << lineNumber << ". Usando Dark Red Crystal por padrao." << std::endl;
+                newItem.textureID = darkRedCrystalTexture; // Padrão
+                break;
+        }
+        gameItems.push_back(newItem);
+    }
+
+    file.close();
+    std::cout << "Carregados " << gameItems.size() << " itens do arquivo: " << filename << std::endl;
+    return true;
+}
+
+
+// A função generateRandomItems() não será mais necessária se você carregar os itens de um arquivo.
+// Se você quiser a opção de carregar de arquivo OU gerar aleatoriamente, você pode manter essa função
+// e chamar uma ou outra dependendo de uma flag, por exemplo.
+/*
 void generateRandomItems() {
     std::mt19937 rng(std::chrono::system_clock::now().time_since_epoch().count());
     std::uniform_int_distribution<int> distGridX(0, MAP_W - 1);
@@ -333,6 +406,7 @@ void generateRandomItems() {
     }
     std::cout << "Gerados " << gameItems.size() << " itens aleatorios no mapa." << std::endl;
 }
+*/
 
 // ===========================================
 // Nova função para verificar se todos os itens foram coletados
@@ -404,6 +478,15 @@ int main()
         return -1;
     }
 
+    // Carrega os itens do arquivo. Se falhar, você pode optar por gerar aleatoriamente ou sair.
+    if (!loadItemsFromFile("items.txt")) {
+        // Se o carregamento do arquivo falhar, você pode, opcionalmente, chamar generateRandomItems() aqui.
+        // generateRandomItems();
+        std::cerr << "Nao foi possivel carregar os itens do arquivo. Certifique-se de que 'items.txt' existe e esta formatado corretamente." << std::endl;
+        return -1; // Ou continue com um jogo sem itens ou com itens gerados aleatoriamente
+    }
+
+
     const int playerSpriteSheetTotalW = 448;
     const int playerSpriteSheetTotalH = 256;
 
@@ -432,7 +515,8 @@ int main()
     const int nCols = 7;
     const int nRows = 1;
 
-    generateRandomItems(); // Gera os itens após o carregamento do mapa
+    // A chamada para generateRandomItems() foi movida para loadItemsFromFile() ou pode ser removida se você usar apenas o arquivo.
+    // generateRandomItems();
 
     // This is your main game loop. All game logic and rendering should happen inside this one loop.
     while (!glfwWindowShouldClose(win))
