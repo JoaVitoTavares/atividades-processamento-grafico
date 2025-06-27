@@ -14,6 +14,7 @@
 #include <chrono>       // Para seed de números aleatórios
 #include <algorithm>    // Para std::find
 #include <sstream>      // Para parsing de linhas
+#include <map>          // Para armazenar as propriedades dos tiles
 
 typedef unsigned int uint;
 const uint SCR_W = 800, SCR_H = 600;
@@ -21,9 +22,10 @@ const int MAP_H = 15;
 const int MAP_W = 15;
 int mapData[MAP_H][MAP_W];
 
-const int PINK_TILE_INDEX = 6;
-const int IMPASSABLE_TILE_DEEP_WATER = 5;
-const int GAME_OVER_TILE = 3; // Novo: Definindo o ID do tile de game over
+// Definicoes de tiles, agora com base nas propriedades carregadas
+// Removendo PINK_TILE_INDEX, IMPASSABLE_TILE_DEEP_WATER, GAME_OVER_TILE
+// pois serao definidos pelo arquivo de propriedades
+const int PLAYER_INITIAL_TILE_ID = 0; // Exemplo: assumindo que o tile 0 é sempre caminhável e seguro para iniciar
 
 // ===========================================
 // Variáveis Globais do Jogador
@@ -56,6 +58,7 @@ struct GameItem {
     int gridY;
     GLuint textureID; // Agora armazena o ID da textura OpenGL diretamente
     bool collected;   // Se o item foi coletado (para futura lógica)
+    int type;         // Novo: Para identificar o tipo de item (pode ser usado para pontuação, etc.)
 };
 
 std::vector<GameItem> gameItems;
@@ -64,6 +67,7 @@ std::vector<GameItem> gameItems;
 GLuint darkRedCrystalTexture;
 GLuint whiteCrystalTexture;
 GLuint yellowCrystalTexture;
+GLuint gameOverTileTexture; // Nova textura para o tile de game over
 
 // Ajuste os tamanhos para os cristais individuais, se necessário.
 // Assumindo que todos são do mesmo tamanho da spritesheet anterior para consistência inicial.
@@ -248,6 +252,73 @@ void initOutline()
 }
 
 // ===========================================
+// Propriedades dos Tiles
+// ===========================================
+std::map<int, bool> tileWalkableProperties; // tileID -> isWalkable
+std::map<int, bool> tileGameOverProperties; // tileID -> isGameOver
+
+bool loadTilePropertiesFromFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Erro: Nao foi possivel abrir o arquivo de propriedades dos tiles: " << filename << std::endl;
+        return false;
+    }
+
+    std::string line;
+    int lineNumber = 0;
+    while (std::getline(file, line)) {
+        lineNumber++;
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+
+        std::stringstream ss(line);
+        int tileID;
+        int isWalkableInt;
+        int isGameOverInt = 0; // Padrão: não é tile de game over
+
+        // Formato esperado: tileID isWalkable [isGameOver]
+        if (!(ss >> tileID >> isWalkableInt)) {
+            std::cerr << "Erro de formato na linha " << lineNumber << " do arquivo de propriedades dos tiles. Esperado: tileID isWalkable [isGameOver]. Linha: " << line << std::endl;
+            continue;
+        }
+
+        // Tenta ler isGameOver opcionalmente
+        if (ss >> isGameOverInt) {
+            tileGameOverProperties[tileID] = (isGameOverInt == 1);
+        } else {
+            tileGameOverProperties[tileID] = false; // Se não especificado, não é tile de game over
+        }
+
+        tileWalkableProperties[tileID] = (isWalkableInt == 1);
+    }
+    file.close();
+    std::cout << "Propriedades dos tiles carregadas com sucesso de: " << filename << std::endl;
+    return true;
+}
+
+// Função para verificar se um tile é caminhável
+bool isTileWalkable(int tileID) {
+    auto it = tileWalkableProperties.find(tileID);
+    if (it != tileWalkableProperties.end()) {
+        return it->second; // Retorna a propriedade de caminhabilidade definida
+    }
+    // Se o tileID não estiver no mapa, assume que é intransitável por padrão (segurança)
+    std::cerr << "Aviso: Tile ID " << tileID << " nao encontrado nas propriedades. Assumindo como intransitavel." << std::endl;
+    return false;
+}
+
+// Função para verificar se um tile é um tile de game over
+bool isTileGameOver(int tileID) {
+    auto it = tileGameOverProperties.find(tileID);
+    if (it != tileGameOverProperties.end()) {
+        return it->second;
+    }
+    return false; // Se não estiver definido, não é um tile de game over
+}
+
+
+// ===========================================
 // Carregamento do Mapa e Geração de Itens
 // ===========================================
 bool loadMapFromFile(const std::string& filename) {
@@ -276,12 +347,13 @@ bool loadMapFromFile(const std::string& filename) {
             }
 
             // Garante que a posição inicial do jogador não seja um tile intransitável
-            if (i == playerGridY && j == playerGridX &&
-                (mapData[i][j] == IMPASSABLE_TILE_DEEP_WATER || mapData[i][j] == GAME_OVER_TILE)) { // Modificado: Não iniciar em tile de game over
-                std::cerr << "Erro: O tile de inicio do personagem (" << mapData[i][j]
-                          << ") no centro do mapa [" << i << "][" << j
-                          << "] e intransitavel ou de game over. Por favor, ajuste o mapa." << std::endl;
-                return false;
+            if (i == playerGridY && j == playerGridX) {
+                if (!isTileWalkable(mapData[i][j]) || isTileGameOver(mapData[i][j])) {
+                    std::cerr << "Erro: O tile de inicio do personagem (" << mapData[i][j]
+                              << ") no centro do mapa [" << i << "][" << j
+                              << "] e intransitavel ou de game over. Por favor, ajuste o mapa." << std::endl;
+                    return false;
+                }
             }
         }
     }
@@ -293,6 +365,9 @@ bool loadMapFromFile(const std::string& filename) {
 
 // Nova função para carregar itens de um arquivo
 bool loadItemsFromFile(const std::string& filename) {
+    // Limpa os itens existentes antes de carregar novos
+    gameItems.clear();
+
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Erro: Nao foi possivel abrir o arquivo de itens: " << filename << std::endl;
@@ -322,10 +397,10 @@ bool loadItemsFromFile(const std::string& filename) {
             continue;
         }
 
-        // Verifica se a posição do item não é intransitável ou a posição inicial do jogador
-        if (mapData[gridY][gridX] == IMPASSABLE_TILE_DEEP_WATER || mapData[gridY][gridX] == GAME_OVER_TILE ||
+        // **Validação de caminhabilidade antes da posição do item**
+        if (!isTileWalkable(mapData[gridY][gridX]) || isTileGameOver(mapData[gridY][gridX]) ||
             (gridX == playerGridX && gridY == playerGridY)) {
-            std::cerr << "Aviso: Item na linha " << lineNumber << " em posicao intransitavel ou na posicao do jogador (" << gridX << ", " << gridY << "). Ignorando." << std::endl;
+            std::cerr << "Aviso: Item na linha " << lineNumber << " em posicao intransitavel, de game over ou na posicao do jogador (" << gridX << ", " << gridY << "). Ignorando." << std::endl;
             continue;
         }
 
@@ -333,6 +408,7 @@ bool loadItemsFromFile(const std::string& filename) {
         newItem.gridX = gridX;
         newItem.gridY = gridY;
         newItem.collected = false;
+        newItem.type = textureType; // Armazena o tipo do item, caso precise para pontuação, etc.
 
         // Atribui a textura com base no textureType
         switch (textureType) {
@@ -357,56 +433,6 @@ bool loadItemsFromFile(const std::string& filename) {
     std::cout << "Carregados " << gameItems.size() << " itens do arquivo: " << filename << std::endl;
     return true;
 }
-
-
-// A função generateRandomItems() não será mais necessária se você carregar os itens de um arquivo.
-// Se você quiser a opção de carregar de arquivo OU gerar aleatoriamente, você pode manter essa função
-// e chamar uma ou outra dependendo de uma flag, por exemplo.
-/*
-void generateRandomItems() {
-    std::mt19937 rng(std::chrono::system_clock::now().time_since_epoch().count());
-    std::uniform_int_distribution<int> distGridX(0, MAP_W - 1);
-    std::uniform_int_distribution<int> distGridY(0, MAP_H - 1);
-
-    // Lista de IDs de textura dos cristais
-    std::vector<GLuint> crystalTextures = {
-            darkRedCrystalTexture,
-            whiteCrystalTexture,
-            yellowCrystalTexture
-    };
-    std::uniform_int_distribution<int> distCrystalType(0, crystalTextures.size() - 1);
-
-
-    const int numberOfItems = 10; // Número de itens a serem gerados
-
-    for (int i = 0; i < numberOfItems; ++i) {
-        int randX = distGridX(rng);
-        int randY = distGridY(rng);
-
-        // Tenta encontrar um tile que não seja intransitável e não seja a posição inicial do jogador
-        int attempts = 0;
-        while ((mapData[randY][randX] == IMPASSABLE_TILE_DEEP_WATER || mapData[randY][randX] == GAME_OVER_TILE ||
-                (randX == playerGridX && randY == playerGridY)) && attempts < 100) { // Limita as tentativas para evitar loop infinito
-            randX = distGridX(rng);
-            randY = distGridY(rng);
-            attempts++;
-        }
-
-        if (attempts < 100) { // Se encontrou um lugar válido
-            GameItem newItem;
-            newItem.gridX = randX;
-            newItem.gridY = randY;
-            // Atribui uma das texturas de cristal carregadas aleatoriamente
-            newItem.textureID = crystalTextures[distCrystalType(rng)];
-            newItem.collected = false;
-            gameItems.push_back(newItem);
-        } else {
-            std::cerr << "Aviso: Nao foi possivel encontrar um local valido para gerar um item apos varias tentativas." << std::endl;
-        }
-    }
-    std::cout << "Gerados " << gameItems.size() << " itens aleatorios no mapa." << std::endl;
-}
-*/
 
 // ===========================================
 // Nova função para verificar se todos os itens foram coletados
@@ -441,6 +467,12 @@ int main()
 
     glfwSetKeyCallback(win, key_callback);
 
+    // 1. Carrega as propriedades dos tiles PRIMEIRO
+    if (!loadTilePropertiesFromFile("tile_properties.txt")) {
+        return -1;
+    }
+
+    // 2. Carrega o mapa (que agora usa as propriedades dos tiles)
     if (!loadMapFromFile("map.txt")) {
         return -1;
     }
@@ -465,6 +497,7 @@ int main()
     darkRedCrystalTexture = loadTexture("resources/Dark_red_ crystal1.png");
     whiteCrystalTexture = loadTexture("resources/White_crystal1.png");
     yellowCrystalTexture = loadTexture("resources/Yellow_crystal1.png");
+    gameOverTileTexture = loadTexture("resources/game_over_tile.png"); // Carregue sua textura de game over aqui
 
     if (playerSpriteSheet == 0) {
         std::cerr << "Erro fatal: Nao foi possivel carregar a spritesheet do jogador (Vampires2_Run_full.png). Verifique o caminho e o ficheiro." << std::endl;
@@ -477,13 +510,17 @@ int main()
         glfwTerminate();
         return -1;
     }
+    if (gameOverTileTexture == 0) {
+        std::cerr << "Aviso: Nao foi possivel carregar a textura do tile de Game Over (game_over_tile.png). O jogo continuara sem essa visualizacao especifica." << std::endl;
+    }
 
-    // Carrega os itens do arquivo. Se falhar, você pode optar por gerar aleatoriamente ou sair.
+
+    // 3. Carrega os itens do arquivo. A validação de posição agora usa as propriedades carregadas.
     if (!loadItemsFromFile("items.txt")) {
-        // Se o carregamento do arquivo falhar, você pode, opcionalmente, chamar generateRandomItems() aqui.
-        // generateRandomItems();
+        // Se o carregamento do arquivo falhar, você pode, opcionalmente, lidar com isso aqui.
+        // Por exemplo, gerar itens aleatoriamente se o arquivo não for encontrado ou estiver vazio.
         std::cerr << "Nao foi possivel carregar os itens do arquivo. Certifique-se de que 'items.txt' existe e esta formatado corretamente." << std::endl;
-        return -1; // Ou continue com um jogo sem itens ou com itens gerados aleatoriamente
+        // return -1; // Comente para permitir continuar sem itens ou com itens gerados aleatoriamente
     }
 
 
@@ -514,9 +551,6 @@ int main()
 
     const int nCols = 7;
     const int nRows = 1;
-
-    // A chamada para generateRandomItems() foi movida para loadItemsFromFile() ou pode ser removida se você usar apenas o arquivo.
-    // generateRandomItems();
 
     // This is your main game loop. All game logic and rendering should happen inside this one loop.
     while (!glfwWindowShouldClose(win))
@@ -586,23 +620,24 @@ int main()
                 if (newPlayerGridX >= 0 && newPlayerGridX < MAP_W &&
                     newPlayerGridY >= 0 && newPlayerGridY < MAP_H)
                 {
-                    if (mapData[newPlayerGridY][newPlayerGridX] != IMPASSABLE_TILE_DEEP_WATER)
+                    // **Usando a nova função isTileWalkable**
+                    if (isTileWalkable(mapData[newPlayerGridY][newPlayerGridX]))
                     {
                         playerGridX = newPlayerGridX;
                         playerGridY = newPlayerGridY;
                         playerAnimationFrameY = newPlayerAnimY;
 
-                        // Check for Game Over tile
-                        if (mapData[playerGridY][playerGridX] == GAME_OVER_TILE) {
+                        // **Usando a nova função isTileGameOver**
+                        if (isTileGameOver(mapData[playerGridY][playerGridX])) {
                             isGameOver = true;
-                            std::cout << "Game Over! Voce tocou no tile " << GAME_OVER_TILE << "!" << std::endl;
+                            std::cout << "Game Over! Voce tocou em um tile de game over!" << std::endl;
                         }
 
                         // Item collection logic
                         for (auto& item : gameItems) {
                             if (!item.collected && item.gridX == playerGridX && item.gridY == playerGridY) {
                                 item.collected = true;
-                                std::cout << "Item coletado!" << std::endl;
+                                std::cout << "Item coletado! Tipo: " << item.type << std::endl;
                                 // Check for win condition immediately after collecting an item
                                 if (areAllItemsCollected()) {
                                     hasWon = true;
@@ -630,7 +665,7 @@ int main()
                 g_keysPressed[i] = false;
                 g_keysHandled[i] = false;
             }
-            // You could display a "Game Over" or "You Won!" message here in the future
+            // Você pode exibir uma mensagem de "Game Over" ou "Você Venceu!" aqui
         }
 
         // Rendering code

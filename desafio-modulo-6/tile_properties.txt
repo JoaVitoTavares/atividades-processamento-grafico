@@ -1,0 +1,13 @@
+# Sintaxe: <tileID> <isWalkable> [isGameOver]
+# tileID: O ID do tile conforme usado em map.txt
+# isWalkable: 1 se o jogador pode caminhar sobre ele, 0 se não.
+# isGameOver (opcional): 1 se o jogador perde ao tocar neste tile, 0 caso contrário.
+
+# Exemplo:
+0 1     # Tile 0
+1 1     # dTile 1
+2 1     # Tile 2
+3 1 1   # Tile 3
+4 1     # Tile 4
+5 0     # Tile 5
+6 1     # Tile 6
