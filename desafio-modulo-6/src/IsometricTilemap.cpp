@@ -457,13 +457,24 @@ int main()
                 newPlayerAnimY = 1;
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_A] = true;
-            }else if (g_keysPressed[GLFW_KEY_Q] && !g_keysHandled[GLFW_KEY_Q]) { // Sudeste
+            }else if (g_keysPressed[GLFW_KEY_Q] && g_keysPressed[GLFW_KEY_Q]) { // Sudeste
                  newPlayerGridX++;
                 newPlayerAnimY = 1;
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_Q] = true;
             }
-
+            else if (g_keysPressed[GLFW_KEY_Z] && !g_keysHandled[GLFW_KEY_Z]) { // Noroeste (Lado)
+                newPlayerGridY--;
+                newPlayerAnimY = 1;
+                playerAttemptedMove = true;
+                g_keysHandled[GLFW_KEY_Z] = true;
+            }
+            else if (g_keysPressed[GLFW_KEY_X] && !g_keysHandled[GLFW_KEY_X]) { // Noroeste (Lado)
+                newPlayerGridX--;
+                newPlayerAnimY = 3;
+                playerAttemptedMove = true;
+                g_keysHandled[GLFW_KEY_X] = true;
+            }
             else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Noroeste (Lado)
                 newPlayerGridY++; newPlayerGridX--;
                 newPlayerAnimY = 0;
