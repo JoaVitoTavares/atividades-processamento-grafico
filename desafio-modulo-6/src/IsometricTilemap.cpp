@@ -21,11 +21,15 @@ const uint SCR_W = 800, SCR_H = 600;
 const int MAP_H = 15;
 const int MAP_W = 15;
 int mapData[MAP_H][MAP_W];
+// Novo array para armazenar os IDs originais dos tiles
+int originalMapData[MAP_H][MAP_W];
+
 
 // Definicoes de tiles, agora com base nas propriedades carregadas
 // Removendo PINK_TILE_INDEX, IMPASSABLE_TILE_DEEP_WATER, GAME_OVER_TILE
 // pois serao definidos pelo arquivo de propriedades
 const int PLAYER_INITIAL_TILE_ID = 0; // Exemplo: assumindo que o tile 0 é sempre caminhável e seguro para iniciar
+const int HIGHLIGHT_TILE_ID = 6; // ID do tile para destacar a posição atual do jogador
 
 // ===========================================
 // Variáveis Globais do Jogador
@@ -345,6 +349,8 @@ bool loadMapFromFile(const std::string& filename) {
                 std::cerr << "Erro: Falha ao ler o tile em [" << i << "][" << j << "] do arquivo." << std::endl;
                 return false;
             }
+            // Armazena o ID original do tile
+            originalMapData[i][j] = mapData[i][j];
 
             // Garante que a posição inicial do jogador não seja um tile intransitável
             if (i == playerGridY && j == playerGridX) {
@@ -523,6 +529,9 @@ int main()
         // return -1; // Comente para permitir continuar sem itens ou com itens gerados aleatoriamente
     }
 
+    // Armazena a posição anterior do jogador para restaurar o tile
+    int lastPlayerGridX = playerGridX;
+    int lastPlayerGridY = playerGridY;
 
     const int playerSpriteSheetTotalW = 448;
     const int playerSpriteSheetTotalH = 256;
@@ -620,15 +629,28 @@ int main()
                 if (newPlayerGridX >= 0 && newPlayerGridX < MAP_W &&
                     newPlayerGridY >= 0 && newPlayerGridY < MAP_H)
                 {
-                    // **Usando a nova função isTileWalkable**
+                    // Usando a nova função isTileWalkable
                     if (isTileWalkable(mapData[newPlayerGridY][newPlayerGridX]))
                     {
+                        // Se o jogador se moveu, restaure o tile anterior
+                        if (playerGridX != newPlayerGridX || playerGridY != newPlayerGridY) {
+                            mapData[lastPlayerGridY][lastPlayerGridX] = originalMapData[lastPlayerGridY][lastPlayerGridX];
+                        }
+
+                        // Atualiza a posição do jogador
                         playerGridX = newPlayerGridX;
                         playerGridY = newPlayerGridY;
                         playerAnimationFrameY = newPlayerAnimY;
 
-                        // **Usando a nova função isTileGameOver**
-                        if (isTileGameOver(mapData[playerGridY][playerGridX])) {
+                        // Armazena a nova posição como a "última" para o próximo frame
+                        lastPlayerGridX = playerGridX;
+                        lastPlayerGridY = playerGridY;
+
+                        // Mude o tile atual para o HIGHLIGHT_TILE_ID (6)
+                        mapData[playerGridY][playerGridX] = HIGHLIGHT_TILE_ID;
+
+                        // Usando a nova função isTileGameOver
+                        if (isTileGameOver(originalMapData[playerGridY][playerGridX])) { // Use originalMapData para verificar se é um tile de game over, já que mapData é alterado
                             isGameOver = true;
                             std::cout << "Game Over! Voce tocou em um tile de game over!" << std::endl;
                         }
@@ -646,27 +668,32 @@ int main()
                             }
                         }
                     } else {
-                        // If movement is blocked, still update animation direction
+                        // Se o movimento for bloqueado, ainda atualiza a direção da animação
                         playerAnimationFrameY = newPlayerAnimY;
                     }
                 } else {
-                    // If movement is out of bounds, still update animation direction
+                    // Se o movimento for fora dos limites, ainda atualiza a direção da animação
                     playerAnimationFrameY = newPlayerAnimY;
                 }
                 playerAnimationFrameX = (int)(currentTime / g_animationSpeed) % PLAYER_SPRITE_RUN_FRAMES;
             } else {
-                playerAnimationFrameX = 0; // Reset to idle frame if no movement
+                playerAnimationFrameX = 0; // Reset para o frame ocioso se não houver movimento
+                // Garante que o tile atual do jogador ainda esteja destacado, mesmo se não houver movimento
+                mapData[playerGridY][playerGridX] = HIGHLIGHT_TILE_ID;
+            }
+        } else { // Se o jogo estiver encerrado (game over ou vitória)
+            // Garante que o tile onde o jogador parou retorne ao original ou mostre o tile de game over
+            if (isGameOver) {
+                mapData[playerGridY][playerGridX] = originalMapData[playerGridY][playerGridX];
+                if (isTileGameOver(originalMapData[playerGridY][playerGridX])) {
+                    // Opcional: Se houver um tile visual específico para "Game Over", você pode defini-lo aqui
+                    // mapData[playerGridY][playerGridX] = ID_DO_TILE_DE_GAME_OVER;
+                }
+            } else if (hasWon) {
+                mapData[playerGridY][playerGridX] = originalMapData[playerGridY][playerGridX];
             }
         }
 
-        // Disable input when the game is over or won
-        if (isGameOver || hasWon) {
-            for (int i = 0; i <= GLFW_KEY_LAST; ++i) {
-                g_keysPressed[i] = false;
-                g_keysHandled[i] = false;
-            }
-            // Você pode exibir uma mensagem de "Game Over" ou "Você Venceu!" aqui
-        }
 
         // Rendering code
         float playerWorldX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
