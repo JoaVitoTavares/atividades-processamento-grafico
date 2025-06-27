@@ -1,9 +1,8 @@
 
 # instruções iniciais
 
-Para rodar a aplicação pode se utilziar CMakelists.txt
-
-Ou para facilitar no caso de usuários linux é possível executar o run.sh
+Para rodar a aplicação pode se utilizar o run.sh,
+para executa-lo faça: ./run.sh no terminal bash
 
 No arquivo items.txt é definido a posição dos itens
  e o arquivo map.txt define o mapa do jogo
