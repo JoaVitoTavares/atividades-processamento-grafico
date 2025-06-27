@@ -10,24 +10,21 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <random>       // Para geração de números aleatórios
-#include <chrono>       // Para seed de números aleatórios
-#include <algorithm>    // Para std::find
-#include <sstream>      // Para parsing de linhas
-#include <map>          // Para armazenar as propriedades dos tiles
+#include <random>
+#include <chrono>
+#include <algorithm>
+#include <sstream>
+#include <map>
 
 typedef unsigned int uint;
 const uint SCR_W = 800, SCR_H = 600;
 const int MAP_H = 15;
 const int MAP_W = 15;
 int mapData[MAP_H][MAP_W];
-// Novo array para armazenar os IDs originais dos tiles
+// Array para armazenar os IDs originais dos tiles
 int originalMapData[MAP_H][MAP_W];
 
 
-// Definicoes de tiles, agora com base nas propriedades carregadas
-// Removendo PINK_TILE_INDEX, IMPASSABLE_TILE_DEEP_WATER, GAME_OVER_TILE
-// pois serao definidos pelo arquivo de propriedades
 const int PLAYER_INITIAL_TILE_ID = 0; // Exemplo: assumindo que o tile 0 é sempre caminhável e seguro para iniciar
 const int HIGHLIGHT_TILE_ID = 6; // ID do tile para destacar a posição atual do jogador
 
@@ -51,8 +48,8 @@ const int PLAYER_SPRITE_RUN_FRAMES = 7;
 const int PLAYER_SPRITE_ROWS = 4;
 
 // Variável de estado do jogo
-bool isGameOver = false; // Novo: Variável para controlar o estado do jogo
-bool hasWon = false; // Novo: Variável para controlar se o jogador venceu
+bool isGameOver = false; // Variável para controlar o estado do jogo
+bool hasWon = false; // Variável para controlar se o jogador venceu
 
 // ===========================================
 // Estrutura para os Itens
@@ -62,7 +59,7 @@ struct GameItem {
     int gridY;
     GLuint textureID; // Agora armazena o ID da textura OpenGL diretamente
     bool collected;   // Se o item foi coletado (para futura lógica)
-    int type;         // Novo: Para identificar o tipo de item (pode ser usado para pontuação, etc.)
+    int type;         // Para identificar o tipo de item (pode ser usado para pontuação, etc.)
 };
 
 std::vector<GameItem> gameItems;
@@ -142,13 +139,13 @@ GLuint quadVAO;
 void initQuad()
 {
     float V[] = {
-            -0.5f,  0.5f,  0.0f, 1.0f, // Top-left
-            0.5f, -0.5f,  1.0f, 0.0f, // Bottom-right
-            -0.5f, -0.5f,  0.0f, 0.0f, // Bottom-left
+            -0.5f,  0.5f,  0.0f, 1.0f, // Canto superior esquerdo
+            0.5f, -0.5f,  1.0f, 0.0f, // Canto inferior direito
+            -0.5f, -0.5f,  0.0f, 0.0f, // Canto inferior esquerdo
 
-            -0.5f,  0.5f,  0.0f, 1.0f, // Top-left
-            0.5f,  0.5f,  1.0f, 1.0f, // Top-right
-            0.5f, -0.5f,  1.0f, 0.0f  // Bottom-right
+            -0.5f,  0.5f,  0.0f, 1.0f, // Canto superior esquerdo
+            0.5f,  0.5f,  1.0f, 1.0f, // Canto superior direito
+            0.5f, -0.5f,  1.0f, 0.0f  // Canto inferior direito
     };
     GLuint VBO;
     glGenVertexArrays(1, &quadVAO);
@@ -172,8 +169,8 @@ layout(location=0) in vec2 aPos;
 layout(location=1) in vec2 aUV;
 uniform mat4 projection;
 uniform mat4 model;
-uniform vec2 texScale; // Mantemos para flexibilidade, mas será 1.0, 1.0 para itens individuais
-uniform vec2 texOffset; // Mantemos para flexibilidade, mas será 0.0, 0.0 para itens individuais
+uniform vec2 texScale;
+uniform vec2 texOffset;
 out vec2 UV;
 void main(){
     UV = aUV * texScale + texOffset;
@@ -403,7 +400,7 @@ bool loadItemsFromFile(const std::string& filename) {
             continue;
         }
 
-        // **Validação de caminhabilidade antes da posição do item**
+        // Validação de caminhabilidade antes da posição do item
         if (!isTileWalkable(mapData[gridY][gridX]) || isTileGameOver(mapData[gridY][gridX]) ||
             (gridX == playerGridX && gridY == playerGridY)) {
             std::cerr << "Aviso: Item na linha " << lineNumber << " em posicao intransitavel, de game over ou na posicao do jogador (" << gridX << ", " << gridY << "). Ignorando." << std::endl;
@@ -446,10 +443,10 @@ bool loadItemsFromFile(const std::string& filename) {
 bool areAllItemsCollected() {
     for (const auto& item : gameItems) {
         if (!item.collected) {
-            return false; // If an uncollected item is found, return false
+            return false; // Se um item não coletado for encontrado, retorna falso
         }
     }
-    return true; // All items have been collected
+    return true; // Todos os itens foram coletados
 }
 
 int main()
@@ -526,7 +523,6 @@ int main()
         // Se o carregamento do arquivo falhar, você pode, opcionalmente, lidar com isso aqui.
         // Por exemplo, gerar itens aleatoriamente se o arquivo não for encontrado ou estiver vazio.
         std::cerr << "Nao foi possivel carregar os itens do arquivo. Certifique-se de que 'items.txt' existe e esta formatado corretamente." << std::endl;
-        // return -1; // Comente para permitir continuar sem itens ou com itens gerados aleatoriamente
     }
 
     // Armazena a posição anterior do jogador para restaurar o tile
@@ -561,7 +557,7 @@ int main()
     const int nCols = 7;
     const int nRows = 1;
 
-    // This is your main game loop. All game logic and rendering should happen inside this one loop.
+    // Este é o seu loop principal do jogo. Toda a lógica do jogo e renderização devem acontecer aqui.
     while (!glfwWindowShouldClose(win))
     {
         double currentTime = glfwGetTime();
@@ -570,67 +566,67 @@ int main()
 
         glfwPollEvents();
 
-        // Game Logic: Only process input and update game state if the game is not over and not won
+        // Lógica do Jogo: Processa a entrada e atualiza o estado do jogo apenas se o jogo não tiver terminado ou sido vencido
         if (!isGameOver && !hasWon) {
             int newPlayerGridX = playerGridX;
             int newPlayerGridY = playerGridY;
             bool playerAttemptedMove = false;
             int newPlayerAnimY = playerAnimationFrameY;
 
-            // Player movement input handling
-            if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // North-East
+            // Tratamento de entrada de movimento do jogador
+            if (g_keysPressed[GLFW_KEY_W] && !g_keysHandled[GLFW_KEY_W]) { // Nordeste
                 newPlayerGridY++; newPlayerGridX++;
-                newPlayerAnimY = 2; // Adjust animation row for this direction
+                newPlayerAnimY = 2; // Ajusta a linha de animação para esta direção
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_W] = true;
             }
-            if (g_keysPressed[GLFW_KEY_E] && !g_keysHandled[GLFW_KEY_E]) { // North-East (alternative for WASD-like feel)
+            if (g_keysPressed[GLFW_KEY_E] && !g_keysHandled[GLFW_KEY_E]) { // Nordeste (alternativa para sensação de WASD)
                 newPlayerGridY++;
                 newPlayerAnimY = 2;
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_E] = true;
-            } else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // South-West (Forward)
+            } else if (g_keysPressed[GLFW_KEY_S] && !g_keysHandled[GLFW_KEY_S]) { // Sudoeste (Para frente)
                 newPlayerGridY--; newPlayerGridX--;
-                newPlayerAnimY = 3; // Adjust animation row for this direction
+                newPlayerAnimY = 3; // Ajusta a linha de animação para esta direção
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_S] = true;
-            } else if (g_keysPressed[GLFW_KEY_A] && !g_keysHandled[GLFW_KEY_A]) { // South-East
+            } else if (g_keysPressed[GLFW_KEY_A] && !g_keysHandled[GLFW_KEY_A]) { // Sudeste
                 newPlayerGridY--; newPlayerGridX++;
-                newPlayerAnimY = 1; // Adjust animation row for this direction
+                newPlayerAnimY = 1; // Ajusta a linha de animação para esta direção
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_A] = true;
-            } else if (g_keysPressed[GLFW_KEY_Q] && !g_keysHandled[GLFW_KEY_Q]) { // East (diagonal movement helper)
-                newPlayerGridX++; // This might need review for isometric movement with Q, E, Z, X
+            } else if (g_keysPressed[GLFW_KEY_Q] && !g_keysHandled[GLFW_KEY_Q]) { // Leste (ajuda para movimento diagonal)
+                newPlayerGridX++;
                 newPlayerAnimY = 1;
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_Q] = true;
             }
-            else if (g_keysPressed[GLFW_KEY_Z] && !g_keysHandled[GLFW_KEY_Z]) { // North-West (diagonal movement helper)
-                newPlayerGridY--; // This might need review for isometric movement with Q, E, Z, X
-                newPlayerAnimY = 1; // Assuming same animation row as 'A' or 'Q' for a similar direction
+            else if (g_keysPressed[GLFW_KEY_Z] && !g_keysHandled[GLFW_KEY_Z]) { // Noroeste (ajuda para movimento diagonal)
+                newPlayerGridY--;
+                newPlayerAnimY = 1; // Assumindo a mesma linha de animação que 'A' ou 'Q' para uma direção similar
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_Z] = true;
             }
-            else if (g_keysPressed[GLFW_KEY_X] && !g_keysHandled[GLFW_KEY_X]) { // South-West (diagonal movement helper)
-                newPlayerGridX--; // This might need review for isometric movement with Q, E, Z, X
-                newPlayerAnimY = 3; // Assuming same animation row as 'S' or 'A' for a similar direction
+            else if (g_keysPressed[GLFW_KEY_X] && !g_keysHandled[GLFW_KEY_X]) { // Sudoeste (ajuda para movimento diagonal)
+                newPlayerGridX--;
+                newPlayerAnimY = 3; // Assumindo a mesma linha de animação que 'S' ou 'A' para uma direção similar
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_X] = true;
             }
-            else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // North-West
+            else if (g_keysPressed[GLFW_KEY_D] && !g_keysHandled[GLFW_KEY_D]) { // Noroeste
                 newPlayerGridY++; newPlayerGridX--;
-                newPlayerAnimY = 0; // Adjust animation row for this direction
+                newPlayerAnimY = 0; // Ajusta a linha de animação para esta direção
                 playerAttemptedMove = true;
                 g_keysHandled[GLFW_KEY_D] = true;
             }
 
             if (playerAttemptedMove) {
-                // Check map boundaries and impassable tiles
+                // Verifica os limites do mapa e tiles intransitáveis
                 if (newPlayerGridX >= 0 && newPlayerGridX < MAP_W &&
                     newPlayerGridY >= 0 && newPlayerGridY < MAP_H)
                 {
                     // Usando a nova função isTileWalkable
-                    if (isTileWalkable(mapData[newPlayerGridY][newPlayerGridX]))
+                    if (isTileWalkable(originalMapData[newPlayerGridY][newPlayerGridX])) // Verifica caminhabilidade do tile original
                     {
                         // Se o jogador se moveu, restaure o tile anterior
                         if (playerGridX != newPlayerGridX || playerGridY != newPlayerGridY) {
@@ -650,17 +646,17 @@ int main()
                         mapData[playerGridY][playerGridX] = HIGHLIGHT_TILE_ID;
 
                         // Usando a nova função isTileGameOver
-                        if (isTileGameOver(originalMapData[playerGridY][playerGridX])) { // Use originalMapData para verificar se é um tile de game over, já que mapData é alterado
+                        if (isTileGameOver(originalMapData[playerGridY][playerGridX])) { // Use originalMapData para verificar se é um tile de game over
                             isGameOver = true;
                             std::cout << "Game Over! Voce tocou em um tile de game over!" << std::endl;
                         }
 
-                        // Item collection logic
+                        // Lógica de coleta de itens
                         for (auto& item : gameItems) {
                             if (!item.collected && item.gridX == playerGridX && item.gridY == playerGridY) {
                                 item.collected = true;
                                 std::cout << "Item coletado! Tipo: " << item.type << std::endl;
-                                // Check for win condition immediately after collecting an item
+                                // Verifica a condição de vitória imediatamente após coletar um item
                                 if (areAllItemsCollected()) {
                                     hasWon = true;
                                     std::cout << "Parabens! Voce coletou todos os itens e venceu o jogo!" << std::endl;
@@ -683,19 +679,23 @@ int main()
             }
         } else { // Se o jogo estiver encerrado (game over ou vitória)
             // Garante que o tile onde o jogador parou retorne ao original ou mostre o tile de game over
+            // Se o jogo está encerrado e o jogador está em um tile de game over, ele pode permanecer como está
+            // Caso contrário, restaure para o original
             if (isGameOver) {
+                // Se é um tile de game over, pode-se decidir se ele volta ao original ou permanece como tile de game over
+                // Neste caso, ele volta ao original para mostrar o tile que era antes de ativar o game over.
                 mapData[playerGridY][playerGridX] = originalMapData[playerGridY][playerGridX];
-                if (isTileGameOver(originalMapData[playerGridY][playerGridX])) {
-                    // Opcional: Se houver um tile visual específico para "Game Over", você pode defini-lo aqui
-                    // mapData[playerGridY][playerGridX] = ID_DO_TILE_DE_GAME_OVER;
-                }
             } else if (hasWon) {
                 mapData[playerGridY][playerGridX] = originalMapData[playerGridY][playerGridX];
             }
+            // Desativa a entrada quando o jogo termina
+            for (int i = 0; i <= GLFW_KEY_LAST; ++i) {
+                g_keysPressed[i] = false;
+                g_keysHandled[i] = false;
+            }
         }
 
-
-        // Rendering code
+        // Código de Renderização
         float playerWorldX = (playerGridY - playerGridX) * halfW + mapOriginOffset.x;
         float playerWorldY = (playerGridY + playerGridX) * halfH + mapOriginOffset.y;
 
@@ -711,7 +711,7 @@ int main()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glUniform1i(locOL, 0);
 
-        // Rendering Map Tiles
+        // Renderização dos Tiles do Mapa
         float dsx_tile = 1.0f / float(nCols);
         float dsy_tile = 1.0f / float(nRows);
 
@@ -739,29 +739,29 @@ int main()
             }
         }
 
-        // Rendering Items
+        // Renderização dos Itens
         glUniform2f(locTS, 1.0f, 1.0f);
         glUniform2f(locTO, 0.0f, 0.0f);
 
         for (const auto& item : gameItems) {
-            if (!item.collected) { // Render only if not collected
+            if (!item.collected) { // Renderiza apenas se não for coletado
                 float itemWorldX = (item.gridY - item.gridX) * halfW + mapOriginOffset.x;
-                float itemWorldY = (item.gridY + item.gridX) * halfH + mapOriginOffset.y + (tileH * 0.5f); // Adjust to sit on top of the tile
-                float itemZ = (item.gridY + item.gridX) * 0.001f + 0.2f; // Z-order: higher than tile, lower than player
+                float itemWorldY = (item.gridY + item.gridX) * halfH + mapOriginOffset.y + (tileH * 0.5f); // Ajusta para ficar em cima do tile
+                float itemZ = (item.gridY + item.gridX) * 0.001f + 0.2f; // Ordem Z: mais alto que o tile, mais baixo que o jogador
 
                 glm::mat4 M_item = glm::translate(glm::mat4(1.0f), glm::vec3(itemWorldX, itemWorldY, itemZ))
                                    * glm::scale(glm::mat4(1.0f), glm::vec3(ITEM_SINGLE_SPRITE_W, ITEM_SINGLE_SPRITE_H, 1));
                 glUniformMatrix4fv(locM, 1, GL_FALSE, glm::value_ptr(M_item));
 
-                glBindTexture(GL_TEXTURE_2D, item.textureID); // Bind the specific item texture
+                glBindTexture(GL_TEXTURE_2D, item.textureID); // Vincula a textura específica do item
                 glBindVertexArray(quadVAO);
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
         }
 
 
-        // Rendering Player Character
-        if (!isGameOver && !hasWon) { // Only render player if game is still active
+        // Renderização do Personagem do Jogador
+        if (!isGameOver && !hasWon) { // Renderiza o jogador apenas se o jogo ainda estiver ativo
             const float dsx_player = playerSingleSpriteW / playerSpriteSheetTotalW;
             const float dsy_player = playerSingleSpriteH / playerSpriteSheetTotalH;
 
@@ -784,8 +784,8 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
-        // Rendering Player Tile Outline
-        if (!isGameOver && !hasWon) { // Only show outline if game is active
+        // Renderização do Contorno do Tile do Jogador
+        if (!isGameOver && !hasWon) { // Mostra o contorno apenas se o jogo estiver ativo
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glUniform1i(locOL, 1);
             glUniform4f(locCLR, 1, 1, 1, 1);
