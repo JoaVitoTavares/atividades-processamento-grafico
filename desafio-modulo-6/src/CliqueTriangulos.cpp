@@ -9,7 +9,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
 #include <iostream>
-#include <cstdlib>
+#include <cstdlib>''
 
 // Janela
 const unsigned int SCR_W = 800, SCR_H = 600;

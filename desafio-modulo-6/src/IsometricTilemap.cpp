@@ -500,7 +500,6 @@ int main()
     darkRedCrystalTexture = loadTexture("resources/Dark_red_ crystal1.png");
     whiteCrystalTexture = loadTexture("resources/White_crystal1.png");
     yellowCrystalTexture = loadTexture("resources/Yellow_crystal1.png");
-    gameOverTileTexture = loadTexture("resources/game_over_tile.png"); // Carregue sua textura de game over aqui
 
     if (playerSpriteSheet == 0) {
         std::cerr << "Erro fatal: Nao foi possivel carregar a spritesheet do jogador (Vampires2_Run_full.png). Verifique o caminho e o ficheiro." << std::endl;
@@ -512,9 +511,6 @@ int main()
         std::cerr << "Erro fatal: Nao foi possivel carregar uma ou mais texturas de cristal. Verifique os caminhos e os ficheiros." << std::endl;
         glfwTerminate();
         return -1;
-    }
-    if (gameOverTileTexture == 0) {
-        std::cerr << "Aviso: Nao foi possivel carregar a textura do tile de Game Over (game_over_tile.png). O jogo continuara sem essa visualizacao especifica." << std::endl;
     }
 
 
